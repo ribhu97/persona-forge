@@ -1,0 +1,70 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+.Spotlight-V100
+.Trashes
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Plans
+plans/
+
+# Packaging / distribution
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+.cache/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# Type checkers / linters
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+.ipython/
+profile_default/
+
+# Environment / secrets
+.env
+.env.*
+.envrc
+.python-version
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.iml
+*.sublime-*
+
+# Logs
+*.log
+
+
