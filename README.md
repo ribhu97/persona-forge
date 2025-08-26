@@ -1,4 +1,4 @@
-## Who Is My User? — AI-Powered Persona Generator
+## PersonaForge — AI-Powered Persona Generator
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/downloads/release/python-3120/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688)](https://fastapi.tiangolo.com/) [![Google Gemini](https://img.shields.io/badge/Google-Gemini%20AI-4285F4)](https://ai.google.dev/) [![uv](https://img.shields.io/badge/deps-uv%20managed-5C4EE5)](https://docs.astral.sh/uv/)
 

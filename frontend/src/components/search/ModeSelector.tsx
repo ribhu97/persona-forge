@@ -68,7 +68,7 @@ export function ModeSelector({ selectedMode, onModeChange, disabled }: ModeSelec
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-2">
+                {/* <p className="text-xs text-muted-foreground mb-2">
                   {mode.description}
                 </p>
                 <div className="text-xs text-muted-foreground">
@@ -81,7 +81,7 @@ export function ModeSelector({ selectedMode, onModeChange, disabled }: ModeSelec
                       </li>
                     ))}
                   </ul>
-                </div>
+                </div> */}
               </div>
             </div>
           </button>
