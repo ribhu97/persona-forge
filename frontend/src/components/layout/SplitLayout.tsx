@@ -75,7 +75,7 @@ export function SplitLayout({
     >
       {/* Left Panel */}
       <div 
-        className="flex-shrink-0 overflow-hidden"
+        className="flex-shrink-0 overflow-hidden transition-all duration-300 ease-out"
         style={{ width: `${ratio * 100}%` }}
       >
         {leftPanel}
@@ -84,17 +84,29 @@ export function SplitLayout({
       {/* Resize Handle */}
       <div
         className={cn(
-          "w-1 bg-border hover:bg-primary/50 cursor-col-resize flex-shrink-0 transition-colors relative group",
+          "w-1 bg-border hover:bg-primary/50 cursor-col-resize flex-shrink-0 transition-all duration-200 ease-out relative group",
           isResizing && "bg-primary"
         )}
         onMouseDown={handleMouseDown}
       >
-        <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/10 transition-colors" />
+        <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/10 transition-all duration-200 ease-out" />
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {rightPanel}
+      <div className="flex-1 min-w-0 transition-all duration-300 ease-out" style={{ height: '100vh', maxHeight: '100vh' }}>
+        <div 
+          className="persona-pane-scroll-fix"
+          style={{ 
+            height: '100%', 
+            maxHeight: '100vh', 
+            overflowY: 'auto', 
+            overflowX: 'hidden',
+            minHeight: '0',
+            flex: '1 1 auto'
+          }}
+        >
+          {rightPanel}
+        </div>
       </div>
     </div>
   );
@@ -126,7 +138,7 @@ export function TabLayout({ tabs, defaultTab, className }: TabLayoutProps) {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "flex-1 px-4 py-3 text-sm font-medium transition-colors relative",
+              "flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 ease-out relative",
               "hover:text-primary hover:bg-accent/50",
               activeTab === tab.id
                 ? "text-primary border-b-2 border-primary bg-accent/30"
@@ -147,7 +159,9 @@ export function TabLayout({ tabs, defaultTab, className }: TabLayoutProps) {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTabContent}
+        <div className="persona-pane-scroll animate-in fade-in duration-200 ease-out">
+          {activeTabContent}
+        </div>
       </div>
     </div>
   );
@@ -184,24 +198,28 @@ export function ResponsiveLayout({
 
   if (isMobile) {
     return (
-      <TabLayout
-        tabs={[
-          { id: 'search', label: 'Search', content: leftPanel },
-          { 
-            id: 'results', 
-            label: rightPanelLabel, 
-            content: rightPanel, 
-            badge: rightPanelBadge 
-          },
-        ]}
-      />
+      <div className="animate-in fade-in duration-300 ease-out">
+        <TabLayout
+          tabs={[
+            { id: 'search', label: 'Search', content: leftPanel },
+            { 
+              id: 'results', 
+              label: rightPanelLabel, 
+              content: rightPanel, 
+              badge: rightPanelBadge 
+            },
+          ]}
+        />
+      </div>
     );
   }
 
   return (
-    <SplitLayout
-      leftPanel={leftPanel}
-      rightPanel={rightPanel}
-    />
+    <div className="animate-in fade-in duration-300 ease-out">
+      <SplitLayout
+        leftPanel={leftPanel}
+        rightPanel={rightPanel}
+      />
+    </div>
   );
 }
