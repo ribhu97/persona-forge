@@ -19,7 +19,9 @@ import {
   Brain,
   Users,
   Search,
-  FileText
+  FileText,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react';
 
 interface PersonaCardProps {
@@ -40,6 +42,11 @@ export function PersonaCard({
   className
 }: PersonaCardProps) {
   const [showActions, setShowActions] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed);
+  };
 
   const handleUpdate = (field: keyof Persona, value: any) => {
     onUpdate(persona.id, { [field]: value });
@@ -79,17 +86,34 @@ export function PersonaCard({
       "relative transition-all duration-200 hover:shadow-md",
       "border-l-4",
       statusColors[persona.status],
+      isCollapsed && "bg-muted/30",
       className
     )}>
-      <CardHeader className="pb-4">
+      <CardHeader className={cn("pb-4", isCollapsed && "pb-3")}>
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleCollapse}
+                className="h-6 w-6 p-0 hover:bg-muted/50 transition-all duration-200 ease-out"
+                title={isCollapsed ? "Expand persona" : "Collapse persona"}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
               <InlineEditor
                 value={persona.name}
                 onSave={(value) => handleUpdate('name', value)}
                 disabled={!isEditable}
-                displayClassName="text-xl font-semibold"
+                displayClassName={cn(
+                  "text-xl font-semibold",
+                  isCollapsed && "text-lg"
+                )}
                 placeholder="Persona Name"
               />
               <span className={cn(
@@ -99,13 +123,20 @@ export function PersonaCard({
                 {persona.status}
               </span>
             </div>
-            <InlineEditor
-              value={persona.role}
-              onSave={(value) => handleUpdate('role', value)}
-              disabled={!isEditable}
-              displayClassName="text-muted-foreground"
-              placeholder="Role/Position"
-            />
+            {!isCollapsed && (
+              <InlineEditor
+                value={persona.role}
+                onSave={(value) => handleUpdate('role', value)}
+                disabled={!isEditable}
+                displayClassName="text-muted-foreground"
+                placeholder="Role/Position"
+              />
+            )}
+            {isCollapsed && (
+              <div className="text-sm text-muted-foreground mt-1">
+                {persona.role || "No role specified"}
+              </div>
+            )}
           </div>
           
           {isEditable && (
@@ -150,13 +181,14 @@ export function PersonaCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* Demographics */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Demographics
-          </h3>
+      {!isCollapsed && (
+        <CardContent className="space-y-6">
+          {/* Demographics */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Demographics
+            </h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <label className="text-muted-foreground text-xs">Age</label>
@@ -320,20 +352,21 @@ export function PersonaCard({
           />
         </div>
 
-        {/* Research Assumptions */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Research Assumptions
-          </h3>
-          <ArrayEditor
-            values={persona.research_assumptions}
-            onUpdate={(values) => handleUpdate('research_assumptions', values)}
-            placeholder="Add research assumption"
-            disabled={!isEditable}
-          />
-        </div>
-      </CardContent>
+                 {/* Research Assumptions */}
+         <div>
+           <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+             <Brain className="h-4 w-4" />
+             Research Assumptions
+           </h3>
+           <ArrayEditor
+             values={persona.research_assumptions}
+             onUpdate={(values) => handleUpdate('research_assumptions', values)}
+             placeholder="Add research assumption"
+             disabled={!isEditable}
+           />
+         </div>
+       </CardContent>
+       )}
 
       {/* Click outside handler for actions menu */}
       {showActions && (

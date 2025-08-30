@@ -12,6 +12,7 @@ interface PersonaPanelProps {
   onExportAll?: () => void;
   onClearAll?: () => void;
   isLoading?: boolean;
+  isTransitioning?: boolean;
   className?: string;
 }
 
@@ -23,6 +24,7 @@ export function PersonaPanel({
   onExportAll,
   onClearAll,
   isLoading = false,
+  isTransitioning = false,
   className
 }: PersonaPanelProps) {
   const primaryPersonas = personas.filter(p => p.status === 'primary');
@@ -80,37 +82,53 @@ export function PersonaPanel({
   }
 
   return (
-    <div className={cn("p-6 space-y-6", className)}>
+    <div className={cn("p-6 space-y-6 min-h-full", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
         <div>
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-xl font-bold text-foreground">
             Generated Personas ({personas.length})
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground font-medium mt-1">
             {primaryPersonas.length} primary, {secondaryPersonas.length} secondary
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {onExportAll && personas.length > 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={onExportAll}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
             >
               <Download className="h-4 w-4" />
               Export All
             </Button>
           )}
           
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearAll}
+            disabled={isTransitioning}
+            className="flex items-center gap-2 transition-all duration-200 ease-out hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-medium rounded-lg"
+          >
+            {isTransitioning ? (
+              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {isTransitioning ? "Clearing..." : "New Search"}
+          </Button>
+          
           {onClearAll && personas.length > 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={onClearAll}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={isTransitioning}
+              className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 ease-out font-medium rounded-lg"
             >
               <Trash2 className="h-4 w-4" />
               Clear All
@@ -122,7 +140,7 @@ export function PersonaPanel({
       {/* Primary Personas */}
       {primaryPersonas.length > 0 && (
         <div>
-          <h3 className="text-md font-medium mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
             <div className="w-3 h-3 bg-blue-500 rounded-full" />
             Primary Personas ({primaryPersonas.length})
           </h3>
@@ -143,7 +161,7 @@ export function PersonaPanel({
       {/* Secondary Personas */}
       {secondaryPersonas.length > 0 && (
         <div>
-          <h3 className="text-md font-medium mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
             <div className="w-3 h-3 bg-purple-500 rounded-full" />
             Secondary Personas ({secondaryPersonas.length})
           </h3>
@@ -162,9 +180,9 @@ export function PersonaPanel({
       )}
 
       {/* Tips */}
-      <div className="mt-8 p-4 bg-muted/50 rounded-lg">
-        <h4 className="font-medium text-sm mb-2">💡 Tips</h4>
-        <ul className="text-sm text-muted-foreground space-y-1">
+      <div className="mt-8 p-5 bg-muted/50 rounded-xl animate-in fade-in slide-in-from-bottom-2 duration-400 ease-out">
+        <h4 className="font-semibold text-sm mb-3 text-foreground">💡 Tips</h4>
+        <ul className="text-sm text-muted-foreground space-y-2 font-medium">
           <li>• Click any field to edit inline</li>
           <li>• Use the ⋯ menu to export, duplicate, or delete personas</li>
           <li>• Primary personas are your main target users</li>
