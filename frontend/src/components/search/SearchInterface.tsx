@@ -87,7 +87,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
     )}>
       {/* Header */}
       <div className="text-center space-y-6 transition-all duration-500 ease-out">
-        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent transition-all duration-500 ease-out font-display">
+        <h1 className="text-5xl font-bold font-mono tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent transition-all duration-500 ease-out font-display">
           Persona Generator
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed transition-all duration-500 ease-out">
