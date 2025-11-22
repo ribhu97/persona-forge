@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from typing import Annotated
 
 from src.database import get_session
@@ -38,7 +38,7 @@ async def signup(user_in: UserCreate, session: Annotated[Session, Depends(get_se
     otp = OneTimePassword(
         user_id=user.id, 
         code=otp_code, 
-        expires_at=datetime.utcnow() + timedelta(minutes=10)
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
     )
     session.add(otp)
     session.commit()
@@ -58,7 +58,7 @@ async def verify_otp(data: OTPVerify, session: Annotated[Session, Depends(get_se
         select(OneTimePassword)
         .where(OneTimePassword.user_id == user.id)
         .where(OneTimePassword.code == data.otp)
-        .where(OneTimePassword.expires_at > datetime.utcnow())
+        .where(OneTimePassword.expires_at > datetime.now(timezone.utc))
     ).first()
     
     if not otp:

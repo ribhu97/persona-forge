@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import Annotated, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.database import get_session
 from src.models import (
@@ -141,7 +141,7 @@ async def send_message(
             session.commit()
             
         # Update conversation timestamp
-        conv.last_message_at = datetime.utcnow()
+        conv.last_message_at = datetime.now(timezone.utc)
         session.add(conv)
         session.commit()
         

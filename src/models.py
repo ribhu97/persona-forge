@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
@@ -10,7 +10,7 @@ class User(SQLModel, table=True):
     auth_provider: str = Field(default="email") # email or google
     name: Optional[str] = None
     is_verified: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     otps: List["OneTimePassword"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     conversations: List["Conversation"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
@@ -22,7 +22,7 @@ class OneTimePassword(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
     code: str
     expires_at: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     user: User = Relationship(back_populates="otps")
 
@@ -31,8 +31,8 @@ class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
     title: Optional[str] = None
-    last_message_at: datetime = Field(default_factory=datetime.utcnow)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_message_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     user: User = Relationship(back_populates="conversations")
     messages: List["Message"] = Relationship(back_populates="conversation", sa_relationship_kwargs={"cascade": "all, delete"})
@@ -43,7 +43,7 @@ class Message(SQLModel, table=True):
     conversation_id: int = Field(foreign_key="conversations.id", ondelete="CASCADE")
     role: str # user or assistant
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     conversation: Conversation = Relationship(back_populates="messages")
     personas: List["Persona"] = Relationship(back_populates="message", sa_relationship_kwargs={"cascade": "all, delete"})
@@ -58,7 +58,7 @@ class Persona(SQLModel, table=True):
     role: str
     tech_comfort: str
     scenario_context: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     message: Message = Relationship(back_populates="personas")
     user: User = Relationship(back_populates="personas")
