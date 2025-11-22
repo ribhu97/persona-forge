@@ -2,7 +2,7 @@ import os
 import json
 from google import genai
 from google.genai import types
-from prompts import refined_generation_prompt
+from src.prompts import refined_generation_prompt
 from dotenv import load_dotenv
 
 load_dotenv()
