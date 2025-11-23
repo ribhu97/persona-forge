@@ -1,8 +1,11 @@
 import axios from 'axios';
-import type { 
-  GeneratePersonasRequest, 
-  ApiResponse, 
-  PersonaResponse 
+import type {
+  GeneratePersonasRequest,
+  ApiResponse,
+  PersonaResponse,
+  User,
+  LoginResponse,
+  SignupResponse
 } from '@/types';
 
 export const apiClient = axios.create({
@@ -13,8 +16,12 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor for loading states
+// Request interceptor for loading states and auth token
 apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
   return config;
 });
@@ -24,7 +31,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error);
-    
+
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      // Optionally redirect to login or clear auth state via store (handled in store)
+    }
+
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timeout - the server took too long to respond';
     } else if (error.response?.status === 500) {
@@ -34,35 +46,57 @@ apiClient.interceptors.response.use(
     } else if (!error.response) {
       error.message = 'Network error - please check your connection';
     }
-    
+
     return Promise.reject(error);
   }
 );
 
+export const authAPI = {
+  login: async (data: any): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/login', data);
+    return response.data;
+  },
+
+  signup: async (data: any): Promise<SignupResponse> => {
+    const response = await apiClient.post<SignupResponse>('/auth/signup', data);
+    return response.data;
+  },
+
+  verifyOtp: async (data: any): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/verify-otp', data);
+    return response.data;
+  },
+
+  me: async (): Promise<User> => {
+    const response = await apiClient.get<User>('/auth/me');
+    return response.data;
+  }
+};
+
 export const personaAPI = {
   generatePersonas: async (data: GeneratePersonasRequest): Promise<PersonaResponse> => {
     const response = await apiClient.post<ApiResponse<PersonaResponse>>(
-      '/generate-personas', 
+      '/conversations/generate-personas',
       { text: data.text }
     );
-    
+
     if (!response.data.success) {
       throw new Error(response.data.message || 'Failed to generate personas');
     }
-    
+
     return response.data.data;
   },
-  
+
   healthCheck: async (): Promise<{ status: string; service: string }> => {
     const response = await apiClient.get('/health');
     return response.data;
   },
-  
+
   // Future endpoint for file uploads
   uploadFiles: async (files: File[]): Promise<any> => {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
-    
+
     const response = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });

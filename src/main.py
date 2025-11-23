@@ -1,31 +1,34 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from generator import generate_personas
+from contextlib import asynccontextmanager
+from src.database import create_db_and_tables
+from src.routers.auth import router as auth_router
+from src.routers.chat import router as chat_router
 import uvicorn
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
 
 app = FastAPI(
     title="User Persona Generator API",
     description="Generate user personas based on product descriptions using AI",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],  # Vite dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class PersonaRequest(BaseModel):
-    text: str
-
-class PersonaResponse(BaseModel):
-    success: bool
-    data: dict
-    message: str = ""
+app.include_router(auth_router)
+app.include_router(chat_router)
 
 @app.get("/")
 async def root():
@@ -33,7 +36,9 @@ async def root():
     return {
         "message": "User Persona Generator API",
         "endpoints": {
-            "POST /generate-personas": "Generate user personas from text",
+            "POST /auth/signup": "Sign up",
+            "POST /auth/login": "Login",
+            "POST /conversations": "Start conversation",
             "GET /health": "Health check endpoint"
         }
     }
@@ -42,40 +47,6 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "persona-generator"}
-
-@app.post("/generate-personas", response_model=PersonaResponse)
-async def generate_personas_endpoint(request: PersonaRequest):
-    """
-    Generate user personas based on the provided text description.
-    
-    This endpoint takes a product description or concept text and returns
-    generated user personas including primary and secondary user types.
-    """
-    try:
-        if not request.text.strip():
-            raise HTTPException(status_code=400, detail="Text cannot be empty")
-        
-        # Call the generate_personas function
-        personas = generate_personas(request.text)
-        
-        if not personas or "personas" not in personas:
-            return PersonaResponse(
-                success=False,
-                data={},
-                message="Failed to generate personas. Please try again."
-            )
-        
-        return PersonaResponse(
-            success=True,
-            data=personas,
-            message=f"Successfully generated {len(personas['personas'])} personas"
-        )
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error generating personas: {str(e)}"
-        )
 
 if __name__ == "__main__":
     uvicorn.run(

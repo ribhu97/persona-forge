@@ -2,10 +2,13 @@ import { SearchInterface } from '@/components/search/SearchInterface';
 import { PersonaPanel } from '@/components/persona/PersonaPanel';
 import { ResponsiveLayout } from '@/components/layout/SplitLayout';
 import { usePersonaStore } from '@/stores/personaStore';
+import { useAuthStore } from '@/stores/authStore';
 import { personaAPI } from '@/lib/api';
 import type { Persona } from '@/types';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { AuthDialog } from '@/components/auth/AuthDialog';
+import { UserStatus } from '@/components/auth/UserStatus';
 
 function App() {
   const {
@@ -21,8 +24,16 @@ function App() {
     clearAll,
   } = usePersonaStore();
 
+  const { isAuthenticated, checkAuth } = useAuthStore();
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
+
+  // Check auth on mount
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   // Handle view transitions
   useEffect(() => {
@@ -33,16 +44,21 @@ function App() {
 
   const handleClearAll = async () => {
     setIsTransitioning(true);
-    
+
     // Wait for fade-out animation
     await new Promise(resolve => setTimeout(resolve, 400));
-    
+
     clearAll();
     setShouldShowSplit(false);
     setIsTransitioning(false);
   };
 
   const handleSearch = async (data: { text: string; mode: any; files: any[] }) => {
+    if (!isAuthenticated) {
+      setIsAuthDialogOpen(true);
+      return;
+    }
+
     setGenerating(true);
     setError(null);
 
@@ -60,7 +76,7 @@ function App() {
       }));
 
       setPersonas(personasWithIds);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate personas:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate personas');
     } finally {
@@ -85,24 +101,30 @@ function App() {
   // If no personas exist, show centered search interface
   if (personas.length === 0) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-background">
+      <div className="h-screen w-screen overflow-hidden bg-background relative">
+        <div className="absolute top-4 right-4 z-50">
+          <UserStatus onLoginClick={() => setIsAuthDialogOpen(true)} />
+        </div>
+
         <div className={cn(
           "transition-all duration-500 ease-out",
-          isTransitioning 
-            ? "opacity-0 scale-95 transform" 
+          isTransitioning
+            ? "opacity-0 scale-95 transform"
             : "opacity-100 scale-100"
         )}>
-          <SearchInterface 
-            onSubmit={handleSearch} 
+          <SearchInterface
+            onSubmit={handleSearch}
             isLoading={isGenerating}
           />
         </div>
-        
+
         {error && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 p-4 bg-red-50 border border-red-200 rounded-lg max-w-md animate-in slide-in-from-bottom-4 duration-300 ease-out">
             <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
+
+        <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />
       </div>
     );
   }
@@ -113,16 +135,16 @@ function App() {
       <div className="p-6">
         <div className={cn(
           "transition-all duration-500 ease-out",
-          isTransitioning 
-            ? "opacity-0 -translate-x-4 transform" 
+          isTransitioning
+            ? "opacity-0 -translate-x-4 transform"
             : "opacity-100 translate-x-0"
         )}>
-          <SearchInterface 
-            onSubmit={handleSearch} 
+          <SearchInterface
+            onSubmit={handleSearch}
             isLoading={isGenerating}
           />
         </div>
-        
+
         {error && (
           <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
             <p className="text-red-700 text-sm">{error}</p>
@@ -136,8 +158,8 @@ function App() {
     <div className="h-full bg-muted/30">
       <div className={cn(
         "transition-all duration-500 ease-out",
-        isTransitioning 
-          ? "opacity-0 translate-x-4 transform" 
+        isTransitioning
+          ? "opacity-0 translate-x-4 transform"
           : "opacity-100 translate-x-0"
       )}>
         <PersonaPanel
@@ -156,6 +178,10 @@ function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden relative">
+      <div className="absolute top-4 right-4 z-50">
+        <UserStatus onLoginClick={() => setIsAuthDialogOpen(true)} />
+      </div>
+
       {/* Transition Overlay */}
       {isTransitioning && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center transition-all duration-500 ease-out">
@@ -165,13 +191,15 @@ function App() {
           </div>
         </div>
       )}
-      
+
       <ResponsiveLayout
         leftPanel={leftPanel}
         rightPanel={rightPanel}
         rightPanelLabel="Personas"
         rightPanelBadge={personas.length}
       />
+
+      <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />
     </div>
   );
 }
