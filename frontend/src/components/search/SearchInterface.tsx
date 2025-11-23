@@ -66,9 +66,9 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!input.trim() || isLoading) return;
-    
+
     await onSubmit({
       text: input.trim(),
       mode,
@@ -87,8 +87,8 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
     )}>
       {/* Header */}
       <div className="text-center space-y-6 transition-all duration-500 ease-out">
-        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent transition-all duration-500 ease-out font-display">
-          Persona Generator
+        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent transition-all duration-500 pb-2 ease-out font-display">
+          Persona Forge
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed transition-all duration-500 ease-out">
           Describe your product or service to generate detailed user personas powered by AI
@@ -112,7 +112,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
               )}
               disabled={isLoading}
             />
-            
+
             {/* Bottom Controls Bar */}
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border transition-all duration-300 ease-out">
               {/* Left Side Controls */}
@@ -128,7 +128,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                 >
                   <Plus className="h-4 w-4 text-muted-foreground" />
                 </Button>
-                
+
                 {/* Settings Button */}
                 <Button
                   type="button"
@@ -158,14 +158,14 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                     {selectedMode.label}
                     <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
-                  
+
                   {/* Dropdown Menu */}
                   {showModeDropdown && (
                     <div className="absolute top-full left-0 mt-3 w-52 bg-background border border-border rounded-xl shadow-strong z-50 animate-in fade-in slide-in-from-top-2 duration-200 ease-out backdrop-blur-sm">
                       {Object.entries(GENERATION_MODES).map(([key, modeOption]) => {
                         const isSelected = key === mode;
                         const isDisabled = modeOption.disabled;
-                        
+
                         return (
                           <button
                             key={key}
@@ -222,7 +222,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
               </div>
             </div>
           </div>
-          
+
           {/* Character Count */}
           <div className="absolute top-6 right-6">
             <span className={cn(
