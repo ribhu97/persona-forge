@@ -67,4 +67,8 @@ profile_default/
 # Logs
 *.log
 
+# Database
+database.db
 
+# uv related
+uv.lock

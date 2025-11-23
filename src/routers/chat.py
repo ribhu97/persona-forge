@@ -153,3 +153,88 @@ async def send_message(
         # Even if generation fails, we might want to return the user message or an error message.
         # But here we raise 500.
         raise HTTPException(status_code=500, detail=f"Error generating personas: {str(e)}")
+
+@router.post("/generate-personas")
+async def generate_personas_api(
+    data: dict,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+):
+    text = data.get("text")
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    # Create conversation
+    conv = Conversation(user_id=user.id, title=text[:50])
+    session.add(conv)
+    session.commit()
+    session.refresh(conv)
+
+    # Save user message
+    user_msg = Message(conversation_id=conv.id, role="user", content=text)
+    session.add(user_msg)
+    session.commit()
+
+    try:
+        # Generate
+        persona_data = generate_personas(text)
+
+        # Save assistant message
+        asst_msg = Message(conversation_id=conv.id, role="assistant", content="Generated personas")
+        session.add(asst_msg)
+        session.commit()
+        session.refresh(asst_msg)
+
+        # Save personas
+        saved_personas = []
+        for p_data in persona_data.get("personas", []):
+            persona = Persona(
+                message_id=asst_msg.id,
+                user_id=user.id,
+                name=p_data["name"],
+                status=p_data["status"],
+                role=p_data["role"],
+                tech_comfort=p_data["tech_comfort"],
+                scenario_context=p_data.get("scenario_context", "")
+            )
+            session.add(persona)
+            session.commit()
+            session.refresh(persona)
+            
+            # Save sub-tables
+            if "demographics" in p_data and isinstance(p_data["demographics"], dict):
+                demo = Demographics(
+                    persona_id=persona.id,
+                    age=str(p_data["demographics"].get("age")),
+                    location=p_data["demographics"].get("location"),
+                    education=p_data["demographics"].get("education"),
+                    industry=p_data["demographics"].get("industry")
+                )
+                session.add(demo)
+                
+            for i, goal in enumerate(p_data.get("goals", [])):
+                session.add(Goal(persona_id=persona.id, goal_text=goal, order_index=i))
+                
+            for i, frust in enumerate(p_data.get("frustrations", [])):
+                session.add(Frustration(persona_id=persona.id, frustration_text=frust, order_index=i))
+                
+            for i, pat in enumerate(p_data.get("behavioral_patterns", [])):
+                session.add(BehavioralPattern(persona_id=persona.id, pattern_text=pat, order_index=i))
+                
+            for i, net in enumerate(p_data.get("influence_networks", [])):
+                session.add(InfluenceNetwork(persona_id=persona.id, network_text=net, order_index=i))
+                
+            for i, crit in enumerate(p_data.get("recruitment_criteria", [])):
+                session.add(RecruitmentCriteria(persona_id=persona.id, criteria_text=crit, order_index=i))
+                
+            for i, assump in enumerate(p_data.get("research_assumptions", [])):
+                session.add(ResearchAssumption(persona_id=persona.id, assumption_text=assump, order_index=i))
+                
+            session.commit()
+            saved_personas.append(p_data)
+
+        return {"success": True, "data": {"personas": saved_personas}}
+
+    except Exception as e:
+        print(f"Error generating personas: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating personas: {str(e)}")

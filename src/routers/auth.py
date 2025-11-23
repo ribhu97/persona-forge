@@ -8,7 +8,8 @@ from src.models import User, OneTimePassword
 from src.schemas import UserCreate, UserLogin, OTPVerify, GoogleLogin, Token
 from src.auth import (
     get_password_hash, verify_password, create_access_token, 
-    generate_otp, verify_google_token, ACCESS_TOKEN_EXPIRE_MINUTES
+    generate_otp, verify_google_token, ACCESS_TOKEN_EXPIRE_MINUTES,
+    get_current_user
 )
 from src.email_service import send_otp_email
 
@@ -120,3 +121,7 @@ async def google_login(data: GoogleLogin, session: Annotated[Session, Depends(ge
             
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/me", response_model=User)
+async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):
+    return current_user
