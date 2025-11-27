@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -7,26 +5,55 @@ services:
       dockerfile: Dockerfile.backend
     restart: always
     volumes:
-      # Persist data in a named volume
       - sqlite_data:/app/data
     env_file:
       - .env
     environment:
-      # Store database in the mounted volume
       - DATABASE_URL=sqlite:///data/database.db
-      # Allow requests from the frontend (served on port 80)
-      - ALLOWED_ORIGINS=http://localhost
+      - ALLOWED_ORIGINS=https://personaforge.pehloo.xyz
+    networks:
+      - app-network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: prod
-    ports:
-      - "80:80"
     depends_on:
       - backend
     restart: always
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-main.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: /bin/sh
+    command: -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $$!; done'
+    networks:
+      - app-network
 
 volumes:
   sqlite_data:
+
+networks:
+  app-network:
+    driver: bridge
