@@ -6,7 +6,7 @@ export interface Demographics {
 }
 
 export interface Persona {
-  id: string;
+  id: string | number;
   name: string;
   status: 'primary' | 'secondary';
   role: string;

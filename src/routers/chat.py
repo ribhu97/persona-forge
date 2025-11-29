@@ -10,7 +10,7 @@ from src.models import (
 )
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
 from src.dependencies import get_current_user
-from src.generator import generate_personas
+from src.generator import generate_personas, generate_chat_name
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
@@ -20,7 +20,18 @@ async def create_conversation(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)]
 ):
-    title = data.title if data.title else "New Conversation"
+    # If a title (first message) is provided, generate a chat name
+    if data.title:
+        try:
+            # Generate a short name based on the first message
+            name_data = generate_chat_name(data.title)
+            title = name_data.get("name", data.title[:50])
+        except Exception as e:
+            print(f"Error generating chat name: {e}")
+            title = data.title[:50] # Fallback to first 50 chars
+    else:
+        title = "New Conversation"
+
     conv = Conversation(user_id=user.id, title=title)
     session.add(conv)
     session.commit()
@@ -238,3 +249,24 @@ async def generate_personas_api(
     except Exception as e:
         print(f"Error generating personas: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating personas: {str(e)}")
+
+@router.post("/generate-chat-name")
+async def generate_chat_name_api(
+    data: dict,
+):
+    text = data.get("text")
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    try:
+        # Generate
+        chat_name = generate_chat_name(text)["name"]
+
+        return {"success": True, "data": {"chat_name": chat_name}}
+
+    except Exception as e:
+        print(f"Error generating chat name: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating chat name: {str(e)}")
+
+
+    
