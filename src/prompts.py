@@ -11,6 +11,22 @@ Provide only the user personas in a clear structured json.
 The schema should include only the following for each persona: name, status(primary or secondary), role, demographics (age, location, education, industry), goals, frustrations, behavioural patterns, tech comfort, scenario-based context, influence networks.
 """
 
+chat_naming_prompt = """
+You are a helpful assistant whose only task is to generate the name for a chat given the first chat message. 
+
+You will get the message, and using it come up with a simple name that summarises what the chat is about.
+Focus on the key topic of the message and come up with a name that is short and easy to remember.
+
+Remember that it is part of an application that helps creating user personas from product ideas, so the core focus should be
+on the product idea.
+
+Provide only the name in a clear structured json like:
+
+{
+    "name": "Chat Name"
+}
+"""
+
 refined_generation_prompt = """
 You are an expert product designer and user researcher with extensive experience at leading technology companies. Your expertise lies in creating strategic persona hypotheses that guide user research planning and recruitment for early-stage product validation.
 

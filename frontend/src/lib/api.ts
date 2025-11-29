@@ -9,7 +9,7 @@ import type {
 } from '@/types';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 300000, // 5 minutes for long-running generations
   headers: {
     'Content-Type': 'application/json',
@@ -100,6 +100,28 @@ export const personaAPI = {
     const response = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return response.data;
+  }
+};
+
+export const chatAPI = {
+  getConversations: async (): Promise<any[]> => {
+    const response = await apiClient.get('/conversations/');
+    return response.data;
+  },
+
+  createConversation: async (title?: string): Promise<any> => {
+    const response = await apiClient.post('/conversations/', { title });
+    return response.data;
+  },
+
+  getMessages: async (conversationId: number): Promise<any[]> => {
+    const response = await apiClient.get(`/conversations/${conversationId}/messages`);
+    return response.data;
+  },
+
+  sendMessage: async (conversationId: number, content: string): Promise<any> => {
+    const response = await apiClient.post(`/conversations/${conversationId}/messages`, { content });
     return response.data;
   }
 };

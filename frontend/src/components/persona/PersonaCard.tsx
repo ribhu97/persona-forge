@@ -4,14 +4,14 @@ import { Button } from '@/components/ui/button';
 import { InlineEditor, ArrayEditor } from './InlineEditor';
 import type { Persona } from '@/types';
 import { cn } from '@/lib/utils';
-import { 
-  MoreHorizontal, 
-  Download, 
-  Copy, 
-  Trash2, 
-  User, 
-  MapPin, 
-  GraduationCap, 
+import {
+  MoreHorizontal,
+  Download,
+  Copy,
+  Trash2,
+  User,
+  MapPin,
+  GraduationCap,
   Briefcase,
   Zap,
   Target,
@@ -41,6 +41,9 @@ export function PersonaCard({
   isEditable = true,
   className
 }: PersonaCardProps) {
+  // Debug log
+  // console.log('PersonaCard render:', persona.id, 'goals:', persona.goals);
+
   const [showActions, setShowActions] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -48,12 +51,30 @@ export function PersonaCard({
     setIsCollapsed(!isCollapsed);
   };
 
+  const sanitizeArray = (arr: any[], key: string) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(item => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') {
+        // @ts-ignore
+        const val = item[key];
+        if (val !== undefined && val !== null) {
+          return String(val);
+        }
+        // Try to find any string property if key fails?
+        // For now just return empty string to prevent crash
+        return '';
+      }
+      return String(item);
+    });
+  };
+
   const handleUpdate = (field: keyof Persona, value: any) => {
-    onUpdate(persona.id, { [field]: value });
+    onUpdate(String(persona.id), { [field]: value });
   };
 
   const handleDemographicsUpdate = (field: keyof Persona['demographics'], value: string) => {
-    onUpdate(persona.id, {
+    onUpdate(String(persona.id), {
       demographics: {
         ...persona.demographics,
         [field]: value
@@ -138,7 +159,7 @@ export function PersonaCard({
               </div>
             )}
           </div>
-          
+
           {isEditable && (
             <div className="relative">
               <Button
@@ -149,7 +170,7 @@ export function PersonaCard({
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
-              
+
               {showActions && (
                 <div className="absolute right-0 top-full mt-1 bg-background border rounded-lg shadow-lg z-10 min-w-[160px]">
                   <button
@@ -168,7 +189,7 @@ export function PersonaCard({
                   </button>
                   <hr className="my-1" />
                   <button
-                    onClick={() => onDelete(persona.id)}
+                    onClick={() => onDelete(String(persona.id))}
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-red-50 hover:text-red-700 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -189,184 +210,184 @@ export function PersonaCard({
               <User className="h-4 w-4" />
               Demographics
             </h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <label className="text-muted-foreground text-xs">Age</label>
-              <div className="flex items-center gap-1 mt-1">
-                <InlineEditor
-                  value={persona.demographics.age}
-                  onSave={(value) => handleDemographicsUpdate('age', value)}
-                  disabled={!isEditable}
-                  placeholder="Age"
-                />
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <label className="text-muted-foreground text-xs">Age</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <InlineEditor
+                    value={persona.demographics.age}
+                    onSave={(value) => handleDemographicsUpdate('age', value)}
+                    disabled={!isEditable}
+                    placeholder="Age"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="text-muted-foreground text-xs">Location</label>
-              <div className="flex items-center gap-1 mt-1">
-                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <InlineEditor
-                  value={persona.demographics.location}
-                  onSave={(value) => handleDemographicsUpdate('location', value)}
-                  disabled={!isEditable}
-                  placeholder="Location"
-                />
+              <div>
+                <label className="text-muted-foreground text-xs">Location</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <InlineEditor
+                    value={persona.demographics.location}
+                    onSave={(value) => handleDemographicsUpdate('location', value)}
+                    disabled={!isEditable}
+                    placeholder="Location"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="text-muted-foreground text-xs">Education</label>
-              <div className="flex items-center gap-1 mt-1">
-                <GraduationCap className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <InlineEditor
-                  value={persona.demographics.education}
-                  onSave={(value) => handleDemographicsUpdate('education', value)}
-                  disabled={!isEditable}
-                  placeholder="Education"
-                />
+              <div>
+                <label className="text-muted-foreground text-xs">Education</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <GraduationCap className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <InlineEditor
+                    value={persona.demographics.education}
+                    onSave={(value) => handleDemographicsUpdate('education', value)}
+                    disabled={!isEditable}
+                    placeholder="Education"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="text-muted-foreground text-xs">Industry</label>
-              <div className="flex items-center gap-1 mt-1">
-                <Briefcase className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <InlineEditor
-                  value={persona.demographics.industry}
-                  onSave={(value) => handleDemographicsUpdate('industry', value)}
-                  disabled={!isEditable}
-                  placeholder="Industry"
-                />
+              <div>
+                <label className="text-muted-foreground text-xs">Industry</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <Briefcase className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <InlineEditor
+                    value={persona.demographics.industry}
+                    onSave={(value) => handleDemographicsUpdate('industry', value)}
+                    disabled={!isEditable}
+                    placeholder="Industry"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Tech Comfort */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Tech Comfort Level
-          </h3>
-          <div className="flex gap-2">
-            {(['low', 'medium', 'high'] as const).map((level) => (
-              <button
-                key={level}
-                onClick={() => isEditable && handleUpdate('tech_comfort', level)}
-                disabled={!isEditable}
-                className={cn(
-                  "px-3 py-1 text-xs rounded-full border transition-colors capitalize",
-                  persona.tech_comfort === level
-                    ? techComfortColors[level]
-                    : "bg-background hover:bg-accent",
-                  !isEditable && "cursor-default"
-                )}
-              >
-                {level}
-              </button>
-            ))}
+          {/* Tech Comfort */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Tech Comfort Level
+            </h3>
+            <div className="flex gap-2">
+              {(['low', 'medium', 'high'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => isEditable && handleUpdate('tech_comfort', level)}
+                  disabled={!isEditable}
+                  className={cn(
+                    "px-3 py-1 text-xs rounded-full border transition-colors capitalize",
+                    persona.tech_comfort === level
+                      ? techComfortColors[level]
+                      : "bg-background hover:bg-accent",
+                    !isEditable && "cursor-default"
+                  )}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Goals */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Goals
-          </h3>
-          <ArrayEditor
-            values={persona.goals}
-            onUpdate={(values) => handleUpdate('goals', values)}
-            placeholder="Add goal"
-            disabled={!isEditable}
-          />
-        </div>
+          {/* Goals */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Goals
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.goals, 'goal_text')}
+              onUpdate={(values) => handleUpdate('goals', values)}
+              placeholder="Add goal"
+              disabled={!isEditable}
+            />
+          </div>
 
-        {/* Frustrations */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Frustrations
-          </h3>
-          <ArrayEditor
-            values={persona.frustrations}
-            onUpdate={(values) => handleUpdate('frustrations', values)}
-            placeholder="Add frustration"
-            disabled={!isEditable}
-          />
-        </div>
+          {/* Frustrations */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Frustrations
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.frustrations, 'frustration_text')}
+              onUpdate={(values) => handleUpdate('frustrations', values)}
+              placeholder="Add frustration"
+              disabled={!isEditable}
+            />
+          </div>
 
-        {/* Behavioral Patterns */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Behavioral Patterns
-          </h3>
-          <ArrayEditor
-            values={persona.behavioral_patterns}
-            onUpdate={(values) => handleUpdate('behavioral_patterns', values)}
-            placeholder="Add behavioral pattern"
-            disabled={!isEditable}
-          />
-        </div>
+          {/* Behavioral Patterns */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              Behavioral Patterns
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.behavioral_patterns, 'pattern_text')}
+              onUpdate={(values) => handleUpdate('behavioral_patterns', values)}
+              placeholder="Add behavioral pattern"
+              disabled={!isEditable}
+            />
+          </div>
 
-        {/* Scenario Context */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Scenario Context
-          </h3>
-          <InlineEditor
-            value={persona.scenario_context}
-            onSave={(value) => handleUpdate('scenario_context', value)}
-            disabled={!isEditable}
-            multiline
-            placeholder="Describe the scenario context"
-            displayClassName="text-sm text-muted-foreground"
-          />
-        </div>
+          {/* Scenario Context */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Scenario Context
+            </h3>
+            <InlineEditor
+              value={persona.scenario_context}
+              onSave={(value) => handleUpdate('scenario_context', value)}
+              disabled={!isEditable}
+              multiline
+              placeholder="Describe the scenario context"
+              displayClassName="text-sm text-muted-foreground"
+            />
+          </div>
 
-        {/* Influence Networks */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Influence Networks
-          </h3>
-          <ArrayEditor
-            values={persona.influence_networks}
-            onUpdate={(values) => handleUpdate('influence_networks', values)}
-            placeholder="Add influence network"
-            disabled={!isEditable}
-          />
-        </div>
+          {/* Influence Networks */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Influence Networks
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.influence_networks, 'network_text')}
+              onUpdate={(values) => handleUpdate('influence_networks', values)}
+              placeholder="Add influence network"
+              disabled={!isEditable}
+            />
+          </div>
 
-        {/* Research Criteria */}
-        <div>
-          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Recruitment Criteria
-          </h3>
-          <ArrayEditor
-            values={persona.recruitment_criteria}
-            onUpdate={(values) => handleUpdate('recruitment_criteria', values)}
-            placeholder="Add recruitment criteria"
-            disabled={!isEditable}
-          />
-        </div>
+          {/* Research Criteria */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Recruitment Criteria
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.recruitment_criteria, 'criteria_text')}
+              onUpdate={(values) => handleUpdate('recruitment_criteria', values)}
+              placeholder="Add recruitment criteria"
+              disabled={!isEditable}
+            />
+          </div>
 
-                 {/* Research Assumptions */}
-         <div>
-           <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-             <Brain className="h-4 w-4" />
-             Research Assumptions
-           </h3>
-           <ArrayEditor
-             values={persona.research_assumptions}
-             onUpdate={(values) => handleUpdate('research_assumptions', values)}
-             placeholder="Add research assumption"
-             disabled={!isEditable}
-           />
-         </div>
-       </CardContent>
-       )}
+          {/* Research Assumptions */}
+          <div>
+            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              Research Assumptions
+            </h3>
+            <ArrayEditor
+              values={sanitizeArray(persona.research_assumptions, 'assumption_text')}
+              onUpdate={(values) => handleUpdate('research_assumptions', values)}
+              placeholder="Add research assumption"
+              disabled={!isEditable}
+            />
+          </div>
+        </CardContent>
+      )}
 
       {/* Click outside handler for actions menu */}
       {showActions && (
