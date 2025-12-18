@@ -1,6 +1,7 @@
 import { Plus, MessageSquare, PanelLeftClose, PanelLeftOpen, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,12 +19,15 @@ export function Sidebar({ className }: SidebarProps) {
         clearCurrentConversation
     } = useChatStore();
 
+    const { isAuthenticated } = useAuthStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isHoveringLogo, setIsHoveringLogo] = useState(false);
 
     useEffect(() => {
-        fetchConversations();
-    }, [fetchConversations]);
+        if (isAuthenticated) {
+            fetchConversations();
+        }
+    }, [fetchConversations, isAuthenticated]);
 
     const handleNewChat = () => {
         clearCurrentConversation();

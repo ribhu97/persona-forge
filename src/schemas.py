@@ -36,30 +36,44 @@ class DemographicsResponse(BaseModel):
     location: Optional[str] = None
     education: Optional[str] = None
     industry: Optional[str] = None
+    
+    model_config = {"from_attributes": True}
 
 class GoalResponse(BaseModel):
     goal_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class FrustrationResponse(BaseModel):
     frustration_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class BehavioralPatternResponse(BaseModel):
     pattern_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class InfluenceNetworkResponse(BaseModel):
     network_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class RecruitmentCriteriaResponse(BaseModel):
     criteria_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class ResearchAssumptionResponse(BaseModel):
     assumption_text: str
     order_index: int
+    
+    model_config = {"from_attributes": True}
 
 class PersonaResponse(BaseModel):
     id: int
@@ -75,6 +89,8 @@ class PersonaResponse(BaseModel):
     influence_networks: List[InfluenceNetworkResponse] = []
     recruitment_criteria: List[RecruitmentCriteriaResponse] = []
     research_assumptions: List[ResearchAssumptionResponse] = []
+    
+    model_config = {"from_attributes": True}
 
 class MessageResponse(BaseModel):
     id: int
@@ -82,6 +98,8 @@ class MessageResponse(BaseModel):
     content: str
     created_at: datetime
     personas: List[PersonaResponse] = []
+    
+    model_config = {"from_attributes": True}
 
 class ConversationResponse(BaseModel):
     id: int

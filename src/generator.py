@@ -2,8 +2,9 @@ import os
 import json
 from google import genai
 from google.genai import types
-from src.prompts import refined_generation_prompt, chat_naming_prompt
+from src.prompts import refined_generation_prompt, chat_naming_prompt, user_follow_up_prompt
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
@@ -164,7 +165,7 @@ def generate_chat_name(first_message: str) -> dict:
     parsed_chat_name = parse_json(raw_output_str, is_chat_name=True)
     return parsed_chat_name 
 
-def generate_personas(text: str) -> dict:
+def generate_personas(text: str, generated_persona: Optional[str] = None) -> dict:
     """
     Generate user personas based on the provided text using Gemini API.
     
@@ -172,6 +173,8 @@ def generate_personas(text: str) -> dict:
     ----------
     text : str
         Product description or concept text to generate personas for
+    generated_persona : Optional[str]
+        Optional generated persona to be used for follow-up requests
         
     Returns
     -------
@@ -193,23 +196,44 @@ def generate_personas(text: str) -> dict:
     )
 
     model = "gemini-2.5-flash-lite"
-    contents = [
-        types.Content(
-            role="user",
-            parts=[
-                types.Part.from_text(text=text),
+    if generated_persona == None:   
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=text),
+                ],
+            ),
+        ]
+        generate_content_config = types.GenerateContentConfig(
+            thinking_config = types.ThinkingConfig(
+                thinking_budget=0,
+            ),
+            response_mime_type="application/json",
+            system_instruction=[
+                types.Part.from_text(text=refined_generation_prompt),
             ],
-        ),
-    ]
-    generate_content_config = types.GenerateContentConfig(
-        thinking_config = types.ThinkingConfig(
-            thinking_budget=0,
-        ),
-        response_mime_type="application/json",
-        system_instruction=[
-            types.Part.from_text(text=refined_generation_prompt),
-        ],
-    )
+        )
+    else:
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=f"User Follow-up request: {text}"),
+                    types.Part.from_text(text=f"Last generated persona json: {generated_persona}"),
+                ],
+            ),
+        ]
+        generate_content_config = types.GenerateContentConfig(
+            thinking_config = types.ThinkingConfig(
+                thinking_budget=0,
+            ),
+            response_mime_type="application/json",
+            system_instruction=[
+                types.Part.from_text(text=user_follow_up_prompt),
+            ],
+        )
+    
     output = client.models.generate_content(
         model=model,
         contents=contents,
