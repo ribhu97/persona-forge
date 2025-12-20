@@ -3,8 +3,8 @@ import { PersonaPanel } from '@/components/persona/PersonaPanel';
 import { ResponsiveLayout } from '@/components/layout/SplitLayout';
 import { usePersonaStore } from '@/stores/personaStore';
 import { useAuthStore } from '@/stores/authStore';
-import type { Persona } from '@/types';
-import { useState, useEffect } from 'react';
+import type { Persona, BackendPersona, PersonaVersion } from '@/types';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { UserStatus } from '@/components/auth/UserStatus';
@@ -39,41 +39,101 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
 
-  // Sync chat personas to persona store
+  const [personaVersions, setPersonaVersions] = useState<PersonaVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const prevMessagesLength = useRef(0);
+
+  // Sync chat personas to persona store and handle versioning
   useEffect(() => {
     if (currentConversationId && messages.length > 0) {
-      const allPersonas = messages.flatMap(m => m.personas || []).map((p: any) => {
-        const extractStrings = (arr: any[], key: string) => {
-          if (!Array.isArray(arr)) return [];
-          return arr.map(item => {
-            if (typeof item === 'object' && item !== null && key in item) {
-              return item[key];
-            }
-            if (typeof item === 'string') return item;
-            return ''; // Never return the object itself
-          });
-        };
+      // 1. Identify versions from messages
+      const msgsWithPersonas = messages.filter(m => m.personas && m.personas.length > 0);
+
+      const versions: PersonaVersion[] = msgsWithPersonas.map(m => {
+        // Transformation logic
+        const personasList = (m.personas || []) as unknown as BackendPersona[]; // Cast assuming backend returns correct shape now relative to type
+
+        const convertedPersonas: Persona[] = personasList.map((p: any) => {
+          // Helper to extract strings from arrays of objects if needed, or if types match directly
+          // The backend now returns {goal_text: string, ...}[] but frontend Persona expects string[]
+          // We need to map them.
+          const extractStrings = (arr: any[], key: string) => {
+            if (!Array.isArray(arr)) return [];
+            return arr.map(item => {
+              if (typeof item === 'object' && item !== null && key in item) {
+                return String(item[key]);
+              }
+              if (typeof item === 'string') return item;
+              return '';
+            }).filter(Boolean);
+          };
+
+          return {
+            id: p.id,
+            name: p.name,
+            status: p.status,
+            role: p.role,
+            tech_comfort: p.tech_comfort,
+            scenario_context: p.scenario_context || '',
+            demographics: {
+              age: String(p.demographics?.age || ''),
+              location: String(p.demographics?.location || ''),
+              education: String(p.demographics?.education || ''),
+              industry: String(p.demographics?.industry || ''),
+            },
+            goals: extractStrings(p.goals, 'goal_text'),
+            frustrations: extractStrings(p.frustrations, 'frustration_text'),
+            behavioral_patterns: extractStrings(p.behavioral_patterns, 'pattern_text'),
+            influence_networks: extractStrings(p.influence_networks, 'network_text'),
+            recruitment_criteria: extractStrings(p.recruitment_criteria, 'criteria_text'),
+            research_assumptions: extractStrings(p.research_assumptions, 'assumption_text'),
+          };
+        });
 
         return {
-          ...p,
-          demographics: {
-            age: p.demographics?.age || '',
-            location: p.demographics?.location || '',
-            education: p.demographics?.education || '',
-            industry: p.demographics?.industry || '',
-          },
-          goals: extractStrings(p.goals, 'goal_text'),
-          frustrations: extractStrings(p.frustrations, 'frustration_text'),
-          behavioral_patterns: extractStrings(p.behavioral_patterns, 'pattern_text'),
-          influence_networks: extractStrings(p.influence_networks, 'network_text'),
-          recruitment_criteria: extractStrings(p.recruitment_criteria, 'criteria_text'),
-          research_assumptions: extractStrings(p.research_assumptions, 'assumption_text'),
+          id: String(m.id),
+          timestamp: new Date(m.created_at),
+          personas: convertedPersonas
         };
       });
-      // Ensure IDs are strings for consistency if needed, or just pass as is since we updated the type
-      setPersonas(allPersonas as Persona[]);
+
+      setPersonaVersions(versions);
+
+      // 2. Determine which version to show
+      // If new messages arrived (length changed), auto-switch to latest
+      const hasNewMessages = messages.length > prevMessagesLength.current;
+      prevMessagesLength.current = messages.length;
+
+      if (versions.length > 0) {
+        const latestVersionId = versions[versions.length - 1].id;
+
+        if (hasNewMessages || !selectedVersionId) {
+          // Auto-select latest
+          setSelectedVersionId(latestVersionId);
+        }
+      } else {
+        setPersonas([]);
+      }
+    } else {
+      setPersonaVersions([]);
+      // setPersonas([]); // Don't clear immediately if we want to show empty state via persona store?
+      // Actually persona store clearAll does this.
     }
-  }, [messages, currentConversationId, setPersonas]);
+  }, [messages, currentConversationId, setPersonas]); // removed selectedVersionId from deps to avoid loops?
+
+  // Effect to update displayed personas based on selection
+  useEffect(() => {
+    if (personaVersions.length > 0) {
+      // If selectedVersionId is valid, use it, else use latest
+      const versionToShow = selectedVersionId
+        ? personaVersions.find(v => v.id === selectedVersionId)
+        : personaVersions[personaVersions.length - 1];
+
+      if (versionToShow) {
+        setPersonas(versionToShow.personas);
+      }
+    }
+  }, [selectedVersionId, personaVersions, setPersonas]);
 
   // Check auth on mount
   useEffect(() => {
@@ -180,6 +240,9 @@ function App() {
           onClearAll={handleClearAll}
           isLoading={isChatLoading}
           isTransitioning={isTransitioning}
+          versions={personaVersions}
+          selectedVersionId={selectedVersionId || undefined}
+          onSelectVersion={setSelectedVersionId}
         />
       </div>
     </div>

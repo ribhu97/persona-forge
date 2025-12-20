@@ -1,9 +1,11 @@
+import type { BackendPersona } from './persona';
+
 export interface Message {
     id: number;
     role: 'user' | 'assistant';
     content: string;
     created_at: string;
-    personas?: any[]; // Using any[] for now to avoid circular dependency, or import Persona type
+    personas?: BackendPersona[];
 }
 
 export interface Conversation {

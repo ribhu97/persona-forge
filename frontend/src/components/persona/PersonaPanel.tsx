@@ -2,7 +2,19 @@ import { PersonaCard } from './PersonaCard';
 import { Button } from '@/components/ui/button';
 import type { Persona } from '@/types';
 import { cn } from '@/lib/utils';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Trash2, History, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PersonaPanelProps {
   personas: Persona[];
@@ -14,6 +26,9 @@ interface PersonaPanelProps {
   isLoading?: boolean;
   isTransitioning?: boolean;
   className?: string;
+  versions?: { id: string; timestamp: Date }[]; // Simplified interface or use PersonaVersion
+  selectedVersionId?: string;
+  onSelectVersion?: (id: string) => void;
 }
 
 export function PersonaPanel({
@@ -25,7 +40,10 @@ export function PersonaPanel({
   onClearAll,
   isLoading = false,
   isTransitioning = false,
-  className
+  className,
+  versions,
+  selectedVersionId,
+  onSelectVersion
 }: PersonaPanelProps) {
   const primaryPersonas = personas.filter(p => p.status === 'primary');
   const secondaryPersonas = personas.filter(p => p.status === 'secondary');
@@ -36,7 +54,7 @@ export function PersonaPanel({
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Generating Personas...</h2>
         </div>
-        
+
         <div className="space-y-4">
           {[1, 2].map((i) => (
             <div
@@ -84,7 +102,7 @@ export function PersonaPanel({
   return (
     <div className={cn("p-6 space-y-6 min-h-full", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
+      <div className="flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ease-out mt-8">
         <div>
           <h2 className="text-xl font-bold text-foreground">
             Generated Personas ({personas.length})
@@ -93,46 +111,96 @@ export function PersonaPanel({
             {primaryPersonas.length} primary, {secondaryPersonas.length} secondary
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          {onExportAll && personas.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExportAll}
-              className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
-            >
-              <Download className="h-4 w-4" />
-              Export All
-            </Button>
+          {versions && versions.length > 1 && onSelectVersion && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 font-medium">
+                  <History className="h-4 w-4" />
+                  v{versions.findIndex(v => v.id === selectedVersionId) + 1}
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {versions.map((v, i) => (
+                  <DropdownMenuItem
+                    key={v.id}
+                    onClick={() => onSelectVersion(v.id)}
+                    className={cn(v.id === selectedVersionId && "bg-accent", "cursor-pointer")}
+                  >
+                    <span className="flex-1 font-medium">Version {i + 1}</span>
+                    <span className="text-xs text-muted-foreground ml-3">
+                      {v.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearAll}
-            disabled={isTransitioning}
-            className="flex items-center gap-2 transition-all duration-200 ease-out hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-medium rounded-lg"
-          >
-            {isTransitioning ? (
-              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            {isTransitioning ? "Clearing..." : "New Search"}
-          </Button>
-          
+
+          {onExportAll && personas.length > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onExportAll}
+                    className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export Personas</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onClearAll}
+                  disabled={isTransitioning}
+                  className="flex items-center gap-2 transition-all duration-200 ease-out hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-medium rounded-lg"
+                >
+                  {isTransitioning ? (
+                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>New Chat</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {onClearAll && personas.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClearAll}
-              disabled={isTransitioning}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 ease-out font-medium rounded-lg"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear All
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onClearAll}
+                    disabled={isTransitioning}
+                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 ease-out font-medium rounded-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Clear Personas</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
