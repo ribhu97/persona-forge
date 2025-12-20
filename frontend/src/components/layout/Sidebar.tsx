@@ -78,27 +78,6 @@ export function Sidebar({ className }: SidebarProps) {
                 )}
             </div>
 
-            {/* New Chat Button */}
-            <div className={cn("px-4 pb-4", isCollapsed && "px-2")}>
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                onClick={handleNewChat}
-                                className={cn(
-                                    "flex items-center gap-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors",
-                                    isCollapsed ? "w-10 h-10 justify-center p-0 mx-auto" : "w-full px-4 py-2"
-                                )}
-                            >
-                                <Plus className={cn("w-4 h-4", !isCollapsed && "mr-1")} />
-                                {!isCollapsed && <span>New Chat</span>}
-                            </button>
-                        </TooltipTrigger>
-                        {isCollapsed && <TooltipContent side="right">New Chat</TooltipContent>}
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
-
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
                 <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-2")}>

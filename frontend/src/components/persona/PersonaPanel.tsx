@@ -9,6 +9,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PersonaPanelProps {
   personas: Persona[];
@@ -96,7 +102,7 @@ export function PersonaPanel({
   return (
     <div className={cn("p-6 space-y-6 min-h-full", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
+      <div className="flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ease-out mt-8">
         <div>
           <h2 className="text-xl font-bold text-foreground">
             Generated Personas ({personas.length})
@@ -134,43 +140,67 @@ export function PersonaPanel({
           )}
 
           {onExportAll && personas.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExportAll}
-              className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
-            >
-              <Download className="h-4 w-4" />
-              Export All
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onExportAll}
+                    className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export Personas</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearAll}
-            disabled={isTransitioning}
-            className="flex items-center gap-2 transition-all duration-200 ease-out hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-medium rounded-lg"
-          >
-            {isTransitioning ? (
-              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            {isTransitioning ? "Clearing..." : "New Search"}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onClearAll}
+                  disabled={isTransitioning}
+                  className="flex items-center gap-2 transition-all duration-200 ease-out hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-medium rounded-lg"
+                >
+                  {isTransitioning ? (
+                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>New Chat</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {onClearAll && personas.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClearAll}
-              disabled={isTransitioning}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 ease-out font-medium rounded-lg"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear All
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onClearAll}
+                    disabled={isTransitioning}
+                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 ease-out font-medium rounded-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Clear Personas</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
