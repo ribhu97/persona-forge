@@ -78,6 +78,20 @@ export function Sidebar({ className }: SidebarProps) {
                 )}
             </div>
 
+            {/* New Chat Button */}
+            {!isCollapsed && (
+                <div className="px-4 pb-2">
+                    <Button
+                        onClick={handleNewChat}
+                        className="w-full justify-start gap-2"
+                        variant="outline"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Chat
+                    </Button>
+                </div>
+            )}
+
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
                 <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-2")}>
