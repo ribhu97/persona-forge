@@ -40,10 +40,10 @@ export function SplitLayout({
 
       const containerRect = containerRef.current.getBoundingClientRect();
       const newRatio = (e.clientX - containerRect.left) / containerRect.width;
-      
+
       const leftWidth = containerRect.width * newRatio;
       const rightWidth = containerRect.width * (1 - newRatio);
-      
+
       if (leftWidth >= minLeftWidth && rightWidth >= minRightWidth) {
         setRatio(Math.max(0.2, Math.min(0.8, newRatio)));
       }
@@ -68,13 +68,17 @@ export function SplitLayout({
     };
   }, [isResizing, minLeftWidth, minRightWidth]);
 
+  if (!rightPanel) {
+    return <div className={cn("h-full w-full", className)}>{leftPanel}</div>;
+  }
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className={cn("flex h-full w-full", className)}
     >
       {/* Left Panel */}
-      <div 
+      <div
         className="flex-shrink-0 overflow-hidden transition-all duration-300 ease-out"
         style={{ width: `${ratio * 100}%` }}
       >
@@ -94,12 +98,12 @@ export function SplitLayout({
 
       {/* Right Panel */}
       <div className="flex-1 min-w-0 transition-all duration-300 ease-out" style={{ height: '100vh', maxHeight: '100vh' }}>
-        <div 
+        <div
           className="persona-pane-scroll-fix"
-          style={{ 
-            height: '100%', 
-            maxHeight: '100vh', 
-            overflowY: 'auto', 
+          style={{
+            height: '100%',
+            maxHeight: '100vh',
+            overflowY: 'auto',
             overflowX: 'hidden',
             minHeight: '0',
             flex: '1 1 auto'
@@ -177,12 +181,13 @@ interface ResponsiveLayoutProps {
 }
 
 export function ResponsiveLayout({
+  sidebar,
   leftPanel,
   rightPanel,
   rightPanelLabel = "Results",
   rightPanelBadge,
   breakpoint = 'lg'
-}: ResponsiveLayoutProps) {
+}: ResponsiveLayoutProps & { sidebar?: React.ReactNode }) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -201,13 +206,14 @@ export function ResponsiveLayout({
       <div className="animate-in fade-in duration-300 ease-out">
         <TabLayout
           tabs={[
-            { id: 'search', label: 'Search', content: leftPanel },
-            { 
-              id: 'results', 
-              label: rightPanelLabel, 
-              content: rightPanel, 
-              badge: rightPanelBadge 
-            },
+            ...(sidebar ? [{ id: 'sidebar', label: 'Chats', content: sidebar }] : []),
+            { id: 'search', label: 'Chat', content: leftPanel },
+            ...(rightPanel ? [{
+              id: 'results',
+              label: rightPanelLabel,
+              content: rightPanel,
+              badge: rightPanelBadge
+            }] : []),
           ]}
         />
       </div>
@@ -216,10 +222,19 @@ export function ResponsiveLayout({
 
   return (
     <div className="animate-in fade-in duration-300 ease-out">
-      <SplitLayout
-        leftPanel={leftPanel}
-        rightPanel={rightPanel}
-      />
+      <div className="flex h-screen w-screen overflow-hidden">
+        {sidebar && (
+          <div className="flex-shrink-0">
+            {sidebar}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <SplitLayout
+            leftPanel={leftPanel}
+            rightPanel={rightPanel}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -25,12 +25,17 @@ export function InlineEditor({
   displayClassName,
   disabled = false
 }: InlineEditorProps) {
+  if (typeof value === 'object' && value !== null) {
+    console.error('InlineEditor received object value:', value);
+    return <span className="text-red-500 text-xs">Invalid value</span>;
+  }
+
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
+  const [editValue, setEditValue] = useState(value || '');
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setEditValue(value);
+    setEditValue(value || '');
   }, [value]);
 
   useEffect(() => {
@@ -47,7 +52,7 @@ export function InlineEditor({
   const handleStartEdit = () => {
     if (disabled) return;
     setIsEditing(true);
-    setEditValue(value);
+    setEditValue(value || '');
   };
 
   const handleSave = () => {
@@ -59,7 +64,7 @@ export function InlineEditor({
   };
 
   const handleCancel = () => {
-    setEditValue(value);
+    setEditValue(value || '');
     setIsEditing(false);
     onCancel?.();
   };
@@ -85,7 +90,7 @@ export function InlineEditor({
 
   if (isEditing) {
     const InputComponent = multiline ? 'textarea' : 'input';
-    
+
     return (
       <div className={cn("relative", className)}>
         <InputComponent
@@ -102,7 +107,7 @@ export function InlineEditor({
             editClassName
           )}
         />
-        
+
         <div className="flex items-center gap-1 mt-1">
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevent blur
@@ -138,12 +143,12 @@ export function InlineEditor({
       )}
       title={disabled ? "" : "Click to edit"}
     >
-      {value || (
+      {typeof value === 'string' ? value : JSON.stringify(value) || (
         <span className="text-muted-foreground italic">
           {placeholder}
         </span>
       )}
-      
+
       {!disabled && (
         <Edit3 className="h-3 w-3 opacity-0 group-hover:opacity-50 absolute -top-1 -right-1 transition-opacity" />
       )}
@@ -225,7 +230,7 @@ export function ArrayEditor({
           )}
         </div>
       ))}
-      
+
       {!disabled && values.length < maxItems && (
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">•</span>

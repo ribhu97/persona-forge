@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
+import json
 from typing import Annotated, List
 from datetime import datetime, timezone
 
@@ -10,7 +11,7 @@ from src.models import (
 )
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
 from src.dependencies import get_current_user
-from src.generator import generate_personas
+from src.generator import generate_personas, generate_chat_name
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
@@ -20,7 +21,18 @@ async def create_conversation(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)]
 ):
-    title = data.title if data.title else "New Conversation"
+    # If a title (first message) is provided, generate a chat name
+    if data.title:
+        try:
+            # Generate a short name based on the first message
+            name_data = generate_chat_name(data.title)
+            title = name_data.get("name", data.title[:50])
+        except Exception as e:
+            print(f"Error generating chat name: {e}")
+            title = data.title[:50] # Fallback to first 50 chars
+    else:
+        title = "New Conversation"
+
     conv = Conversation(user_id=user.id, title=title)
     session.add(conv)
     session.commit()
@@ -78,8 +90,59 @@ async def send_message(
     
     # 2. Generate Personas
     try:
+        # Check for history to context
+        # Find last assistant message with personas to use as context
+        statement = select(Message).where(Message.conversation_id == conversation_id).where(Message.role == "assistant").order_by(Message.created_at.desc()).limit(1)
+        last_assistant_msg = session.exec(statement).first()
+        
+        generated_persona_str = None
+        if last_assistant_msg and last_assistant_msg.personas:
+             # Serialize personas
+             personas_list = []
+             for p in last_assistant_msg.personas:
+                 p_dict = {
+                     "name": p.name,
+                     "status": p.status,
+                     "role": p.role,
+                     "tech_comfort": p.tech_comfort,
+                     "scenario_context": p.scenario_context,
+                 }
+                 if p.demographics:
+                      p_dict["demographics"] = {
+                          "age": p.demographics.age,
+                          "location": p.demographics.location,
+                          "education": p.demographics.education,
+                          "industry": p.demographics.industry,
+                      }
+                 # Lists
+                 p_dict["goals"] = sorted([g.goal_text for g in p.goals]) # Order might matter but usually list is enough
+                 # Actually goals has order_index, we should respect that if possible, but simplistic list is likely fine for LLM context
+                 # Let's try to be precise if we can, but accessing relationships directly gives list.
+                 # To be fast, simple list comprehension is fine as models usually load in DB order or we can sort by ID.
+                 # But wait, we have order_index in models.
+                 # Let's simple sort by order_index if possible, or just default list. 
+                 # The relationship `p.goals` is a list. SQLModel doesn't automatically sort by default unless configured.
+                 # Let's just take the text, the LLM is robust enough.
+                 
+                 # Helper to extract ordered text
+                 def get_ordered_text(items, text_attr):
+                     # Sort by order_index if present/loaded, else roughly order
+                     return [getattr(item, text_attr) for item in sorted(items, key=lambda x: x.order_index)]
+
+                 p_dict["goals"] = get_ordered_text(p.goals, "goal_text")
+                 p_dict["frustrations"] = get_ordered_text(p.frustrations, "frustration_text")
+                 p_dict["behavioral_patterns"] = get_ordered_text(p.behavioral_patterns, "pattern_text")
+                 p_dict["influence_networks"] = get_ordered_text(p.influence_networks, "network_text")
+                 p_dict["recruitment_criteria"] = get_ordered_text(p.recruitment_criteria, "criteria_text")
+                 p_dict["research_assumptions"] = get_ordered_text(p.research_assumptions, "assumption_text")
+                 
+                 personas_list.append(p_dict)
+             
+             if personas_list:
+                generated_persona_str = json.dumps({"personas": personas_list})
+
         # Call the generator
-        persona_data = generate_personas(data.content)
+        persona_data = generate_personas(data.content, generated_persona=generated_persona_str)
         
         # 3. Save Assistant Message
         num_personas = len(persona_data.get("personas", []))
@@ -238,3 +301,24 @@ async def generate_personas_api(
     except Exception as e:
         print(f"Error generating personas: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating personas: {str(e)}")
+
+@router.post("/generate-chat-name")
+async def generate_chat_name_api(
+    data: dict,
+):
+    text = data.get("text")
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    try:
+        # Generate
+        chat_name = generate_chat_name(text)["name"]
+
+        return {"success": True, "data": {"chat_name": chat_name}}
+
+    except Exception as e:
+        print(f"Error generating chat name: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating chat name: {str(e)}")
+
+
+    

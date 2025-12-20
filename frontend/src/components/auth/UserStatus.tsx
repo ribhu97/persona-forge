@@ -34,7 +34,11 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
                     </div>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent
+                className="w-56 bg-white/90 backdrop-blur-sm z-50"
+                align="end"
+                forceMount
+            >
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
