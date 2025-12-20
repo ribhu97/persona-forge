@@ -70,6 +70,11 @@ export const authAPI = {
   me: async (): Promise<User> => {
     const response = await apiClient.get<User>('/auth/me');
     return response.data;
+  },
+
+  googleLogin: async (token: string): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/google', { token });
+    return response.data;
   }
 };
 

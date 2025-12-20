@@ -4,7 +4,8 @@ from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from google.oauth2 import id_token
-from google.auth.transport import requests
+from google.auth.transport import requests as google_requests
+import httpx
 import random
 import string
 
@@ -47,10 +48,20 @@ def verify_google_token(token: str) -> Optional[dict]:
         # Note: In a real scenario, you must provide the client ID.
         # For now, if it's None, verify_oauth2_token might skip audience check if not provided,
         # but it's better to be explicit.
-        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
         return idinfo
     except ValueError as e:
-        print(f"Google token verification failed: {e}")
+        # If ID token verification fails, try as Access Token (userinfo endpoint)
+        try:
+            response = httpx.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+            if response.status_code == 200:
+                return response.json()
+            print(f"Google token verification failed (ID token: {e}, Access token: {response.text})")
+        except Exception as exc:
+            print(f"Google token verification error: {exc}")
         return None
 
 from fastapi import Depends, HTTPException, status
