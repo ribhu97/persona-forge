@@ -10,6 +10,7 @@ load_dotenv()
 from src.database import create_db_and_tables
 from src.routers.auth import router as auth_router
 from src.routers.chat import router as chat_router
+from src.routers.export import router as export_router
 import uvicorn
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(export_router)
 
 @app.get("/")
 async def root():

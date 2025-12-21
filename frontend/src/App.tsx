@@ -185,11 +185,6 @@ function App() {
     addPersona(duplicated);
   };
 
-  const handleExportAll = () => {
-    // TODO: Implement PDF export functionality
-    console.log('Export all personas');
-  };
-
   // Determine content based on state
   const isInitialState = personas.length === 0 && !currentConversationId;
 
@@ -236,7 +231,6 @@ function App() {
           onUpdatePersona={updatePersona}
           onDeletePersona={deletePersona}
           onDuplicatePersona={handleDuplicatePersona}
-          onExportAll={handleExportAll}
           onClearAll={handleClearAll}
           isLoading={isChatLoading}
           isTransitioning={isTransitioning}

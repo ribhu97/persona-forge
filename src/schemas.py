@@ -106,3 +106,15 @@ class ConversationResponse(BaseModel):
     title: Optional[str]
     last_message_at: datetime
     created_at: datetime
+
+# Export Schemas
+class ExportRequest(BaseModel):
+    format: str  # "pdf" or "json"
+    persona_ids: List[int]  # IDs of personas to export
+
+class ExportStatusResponse(BaseModel):
+    can_export: bool
+    account_type: int  # 0=Free, 1=Admin, etc.
+    exports_remaining: int  # For free users: 0 or 1
+    last_export_at: Optional[datetime] = None
+    next_export_available: Optional[datetime] = None  # When rate limit resets
