@@ -15,6 +15,11 @@ interface AuthDialogProps {
 type AuthMode = 'login' | 'signup';
 type SignupStep = 'details' | 'otp';
 
+interface GoogleTokenResponse {
+    credential?: string;
+    access_token?: string;
+}
+
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     const [mode, setMode] = useState<AuthMode>('login');
     const [signupStep, setSignupStep] = useState<SignupStep>('details');
@@ -76,19 +81,27 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         }
     };
 
-    const handleGoogleSuccess = async (tokenResponse: any) => {
+    const handleGoogleSuccess = async (tokenResponse: GoogleTokenResponse) => {
         setError(null);
         setIsLoading(true);
         try {
             // Support both credential (ID token) and access_token
             const token = tokenResponse.credential || tokenResponse.access_token;
-            if (token) {
-                const response = await authAPI.googleLogin(token);
-                setToken(response.access_token);
-                const user = await authAPI.me();
-                setUser(user);
-                handleOpenChange(false);
+
+            if (!token) {
+                throw new Error('Google Login Failed: No token received');
             }
+
+            const response = await authAPI.googleLogin({ token });
+
+            if (!response || !response.access_token) {
+                throw new Error('Invalid response from server during Google login');
+            }
+
+            setToken(response.access_token);
+            const user = await authAPI.me();
+            setUser(user);
+            handleOpenChange(false);
         } catch (err: any) {
             setError(err.message || 'Google login failed');
         } finally {
