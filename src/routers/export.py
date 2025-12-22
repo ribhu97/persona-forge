@@ -41,8 +41,13 @@ def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
     if user.last_export_at is None:
         return True, 1, None
     
+    # Ensure last_export_at is aware for comparison (SQLite might return naive)
+    last_export = user.last_export_at
+    if last_export.tzinfo is None:
+        last_export = last_export.replace(tzinfo=timezone.utc)
+        
     # Calculate when next export is available
-    next_available = user.last_export_at + timedelta(days=EXPORT_RATE_LIMIT_DAYS)
+    next_available = last_export + timedelta(days=EXPORT_RATE_LIMIT_DAYS)
     
     if datetime.now(timezone.utc) >= next_available:
         return True, 1, None
@@ -290,10 +295,7 @@ async def export_personas(
     if data.format not in ["pdf", "json"]:
         raise HTTPException(status_code=400, detail="Format must be 'pdf' or 'json'")
     
-    # Fetch personas
-    if not data.persona_ids:
-        raise HTTPException(status_code=400, detail="No persona IDs provided")
-    
+    # Fetch personas (filtered by user_id for security)
     personas = session.exec(
         select(Persona).where(
             Persona.id.in_(data.persona_ids),
@@ -301,17 +303,13 @@ async def export_personas(
         )
     ).all()
     
-    if not personas:
-        raise HTTPException(status_code=404, detail="No personas found for the given IDs")
+    # Generic error for both missing personas and unauthorized access
+    if not personas or len(personas) < len(data.persona_ids):
+        raise HTTPException(status_code=404, detail="No personas found")
     
     # Serialize personas
     personas_data = [serialize_persona_for_export(p) for p in personas]
     export_date = datetime.now(timezone.utc)
-    
-    # Update user's last export timestamp
-    user.last_export_at = export_date
-    session.add(user)
-    session.commit()
     
     if data.format == "json":
         # JSON export
@@ -321,6 +319,11 @@ async def export_personas(
             "personas": personas_data
         }
         json_bytes = json.dumps(export_content, indent=2).encode('utf-8')
+        
+        # Update user's last export timestamp ONLY after successful generation
+        user.last_export_at = export_date
+        session.add(user)
+        session.commit()
         
         return StreamingResponse(
             io.BytesIO(json_bytes),
@@ -332,6 +335,11 @@ async def export_personas(
     else:
         # PDF export
         pdf_bytes = generate_pdf(personas_data, export_date)
+        
+        # Update user's last export timestamp ONLY after successful generation
+        user.last_export_at = export_date
+        session.add(user)
+        session.commit()
         
         return StreamingResponse(
             io.BytesIO(pdf_bytes),

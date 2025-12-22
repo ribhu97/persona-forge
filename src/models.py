@@ -11,7 +11,7 @@ class User(SQLModel, table=True):
     name: Optional[str] = None
     is_verified: bool = Field(default=False)
     account_type: int = Field(default=0)  # 0=Free, 1=Admin, future: 2=Pro, 3=Enterprise
-    last_export_at: Optional[datetime] = None  # Track monthly export limit
+    last_export_at: Optional[datetime] = Field(default=None, index=True)  # Track monthly export limit
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     otps: List["OneTimePassword"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})

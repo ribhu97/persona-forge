@@ -64,13 +64,20 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
 
             // Create download link
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `personas_${new Date().toISOString().slice(0, 10)}.${selectedFormat}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            try {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `personas_${new Date().toISOString().slice(0, 10)}.${selectedFormat}`;
+                document.body.appendChild(a);
+                a.click();
+
+                // Small delay to ensure browser triggers download before cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                }, 100);
+            } finally {
+                window.URL.revokeObjectURL(url);
+            }
 
             setSuccess(true);
 
@@ -114,7 +121,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                             Export Personas
                         </Dialog.Title>
                         <Dialog.Description className="text-sm text-muted-foreground">
-                            Download your {personas.length} persona{personas.length !== 1 ? 's' : ''} as PDF or JSON
+                            Download your {personas.length} persona{personas.length === 1 ? '' : 's'} as PDF or JSON
                         </Dialog.Description>
                     </div>
 

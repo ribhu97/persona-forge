@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 # Auth Schemas
@@ -109,8 +109,8 @@ class ConversationResponse(BaseModel):
 
 # Export Schemas
 class ExportRequest(BaseModel):
-    format: str  # "pdf" or "json"
-    persona_ids: List[int]  # IDs of personas to export
+    format: Literal["pdf", "json"]
+    persona_ids: List[int] = Field(..., min_length=1)  # At least one persona required
 
 class ExportStatusResponse(BaseModel):
     can_export: bool
