@@ -4,9 +4,21 @@ from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from google.oauth2 import id_token
-from google.auth.transport import requests
+from google.auth.transport import requests as google_requests
+import httpx
 import random
 import string
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlmodel import Session, select
+from typing import Annotated
+from src.database import get_session
+from src.models import User
 
 # Config
 SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey")
@@ -47,18 +59,46 @@ def verify_google_token(token: str) -> Optional[dict]:
         # Note: In a real scenario, you must provide the client ID.
         # For now, if it's None, verify_oauth2_token might skip audience check if not provided,
         # but it's better to be explicit.
-        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
         return idinfo
     except ValueError as e:
-        print(f"Google token verification failed: {e}")
-        return None
+        # If ID token verification fails, try as Access Token (userinfo endpoint)
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                # To be secure, we should verify the token is intended for our client_id
+                # First check token info
+                token_info_resp = client.get(
+                    'https://oauth2.googleapis.com/tokeninfo',
+                    params={'access_token': token}
+                )
+                
+                if token_info_resp.status_code != 200:
+                    print(f"Google tokeninfo check failed: {token_info_resp.text}")
+                    return None
+                
+                token_info = token_info_resp.json()
+                # Verify that this token was issued for our GOOGLE_CLIENT_ID
+                # 'azp' (Authorized party) or 'aud' (Audience) should match our client id
+                is_valid_audience = (
+                    token_info.get('azp') == GOOGLE_CLIENT_ID or 
+                    token_info.get('aud') == GOOGLE_CLIENT_ID
+                )
+                
+                if not is_valid_audience:
+                    print(f"Google token verification failed: Audience mismatch. azp={token_info.get('azp')}, aud={token_info.get('aud')}")
+                    return None
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlmodel import Session, select
-from typing import Annotated
-from src.database import get_session
-from src.models import User
+                # Now get userinfo for actual data (name, email)
+                response = client.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers={'Authorization': f'Bearer {token}'}
+                )
+                if response.status_code == 200:
+                    return response.json()
+                print(f"Google userinfo request failed: {response.text}")
+        except Exception as exc:
+            print(f"Google token verification error: {exc}")
+        return None
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 

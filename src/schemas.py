@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 # Auth Schemas
@@ -106,3 +106,15 @@ class ConversationResponse(BaseModel):
     title: Optional[str]
     last_message_at: datetime
     created_at: datetime
+
+# Export Schemas
+class ExportRequest(BaseModel):
+    format: Literal["pdf", "json"]
+    persona_ids: List[int] = Field(..., min_length=1)  # At least one persona required
+
+class ExportStatusResponse(BaseModel):
+    can_export: bool
+    account_type: int  # 0=Free, 1=Admin, etc.
+    exports_remaining: int  # For free users: 0 or 1
+    last_export_at: Optional[datetime] = None
+    next_export_available: Optional[datetime] = None  # When rate limit resets

@@ -5,7 +5,9 @@ import type {
   PersonaResponse,
   User,
   LoginResponse,
-  SignupResponse
+  SignupResponse,
+  ExportStatus,
+  ExportFormat
 } from '@/types';
 
 export const apiClient = axios.create({
@@ -70,6 +72,11 @@ export const authAPI = {
   me: async (): Promise<User> => {
     const response = await apiClient.get<User>('/auth/me');
     return response.data;
+  },
+
+  googleLogin: async (data: { token: string }): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/google', data);
+    return response.data;
   }
 };
 
@@ -122,6 +129,21 @@ export const chatAPI = {
 
   sendMessage: async (conversationId: number, content: string): Promise<any> => {
     const response = await apiClient.post(`/conversations/${conversationId}/messages`, { content });
+    return response.data;
+  }
+};
+
+export const exportAPI = {
+  getStatus: async (): Promise<ExportStatus> => {
+    const response = await apiClient.get<ExportStatus>('/export/status');
+    return response.data;
+  },
+
+  exportPersonas: async (format: ExportFormat, personaIds: number[]): Promise<Blob> => {
+    const response = await apiClient.post('/export/personas',
+      { format, persona_ids: personaIds },
+      { responseType: 'blob' }
+    );
     return response.data;
   }
 };
