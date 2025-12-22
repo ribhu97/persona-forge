@@ -115,3 +115,14 @@ export interface ConversationEntry {
   mode: GenerationMode;
   files: ProcessedFile[];
 }
+
+// Export types
+export interface ExportStatus {
+  can_export: boolean;
+  account_type: number;
+  exports_remaining: number;
+  last_export_at: string | null;
+  next_export_available: string | null;
+}
+
+export type ExportFormat = 'pdf' | 'json';

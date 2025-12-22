@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { PersonaCard } from './PersonaCard';
+import { ExportDialog } from './ExportDialog';
 import { Button } from '@/components/ui/button';
 import type { Persona } from '@/types';
 import { cn } from '@/lib/utils';
@@ -21,7 +23,6 @@ interface PersonaPanelProps {
   onUpdatePersona: (id: string, updates: Partial<Persona>) => void;
   onDeletePersona: (id: string) => void;
   onDuplicatePersona?: (persona: Persona) => void;
-  onExportAll?: () => void;
   onClearAll?: () => void;
   isLoading?: boolean;
   isTransitioning?: boolean;
@@ -36,7 +37,6 @@ export function PersonaPanel({
   onUpdatePersona,
   onDeletePersona,
   onDuplicatePersona,
-  onExportAll,
   onClearAll,
   isLoading = false,
   isTransitioning = false,
@@ -45,6 +45,8 @@ export function PersonaPanel({
   selectedVersionId,
   onSelectVersion
 }: PersonaPanelProps) {
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+
   const primaryPersonas = personas.filter(p => p.status === 'primary');
   const secondaryPersonas = personas.filter(p => p.status === 'secondary');
 
@@ -139,14 +141,14 @@ export function PersonaPanel({
             </DropdownMenu>
           )}
 
-          {onExportAll && personas.length > 0 && (
+          {personas.length > 0 && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onExportAll}
+                    onClick={() => setIsExportDialogOpen(true)}
                     className="flex items-center gap-2 transition-all duration-200 ease-out font-medium rounded-lg"
                   >
                     <Download className="h-4 w-4" />
@@ -257,6 +259,13 @@ export function PersonaPanel({
           <li>• Secondary personas are edge cases or alternative user types</li>
         </ul>
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        personas={personas}
+      />
     </div>
   );
 }
