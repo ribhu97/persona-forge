@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import razorpay
 import os
 import hmac
@@ -19,10 +19,13 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-    print("Warning: Razorpay keys not found in environment variables")
-
-client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+def get_razorpay_client():
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Razorpay keys are not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."
+        )
+    return razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 class OrderCreate(BaseModel):
     amount: float # In INR
@@ -55,6 +58,7 @@ async def create_order(
             }
         }
         
+        client = get_razorpay_client()
         order = client.order.create(data=data)
         
         # Save pending payment to DB
@@ -72,7 +76,6 @@ async def create_order(
             "order_id": order['id'],
             "amount": order['amount'],
             "currency": order['currency'],
-            "key_id": RAZORPAY_KEY_ID
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -91,6 +94,7 @@ async def verify_payment(
             'razorpay_signature': verify_data.razorpay_signature
         }
         
+        client = get_razorpay_client()
         client.utility.verify_payment_signature(params_dict)
         
         # Update payment status
@@ -126,8 +130,7 @@ async def verify_payment(
         else:
             # Add 30 days
             # real implementation would calculate from now + 30 days
-             from datetime import timedelta
-             current_user.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+            current_user.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
              
         session.add(current_user)
         session.commit()

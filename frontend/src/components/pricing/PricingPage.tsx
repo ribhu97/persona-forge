@@ -99,7 +99,7 @@ interface PricingPageProps {
 }
 
 export function PricingPage({ onClose, className, isAuthenticated, onLogin }: PricingPageProps) {
-    const [currency, setCurrency] = useState<Currency>('USD');
+    const [currency, setCurrency] = useState<Currency>('INR');
     const [isLoading, setIsLoading] = useState<string | null>(null);
 
     const handleSubscribe = async (tierName: string, amount: string) => {
@@ -124,7 +124,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
 
             // 2. Initialize Razorpay
             const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID || order.key_id,
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency,
                 name: "Persona Forge",

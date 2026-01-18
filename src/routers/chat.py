@@ -18,12 +18,7 @@ from datetime import timedelta
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
-@router.post("/", response_model=ConversationResponse)
-async def create_conversation(
-    data: ConversationCreate,
-    user: Annotated[User, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
-):
+def check_conversation_limit(user: User, session: Session):
     # LIMIT CHECK: Threads per month
     # Free: 3, Plus: 20, Pro: Unlimited (9999)
     # Account types: 0=Free, 1=Plus, 2=Pro
@@ -38,9 +33,6 @@ async def create_conversation(
     now = datetime.now(timezone.utc)
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    # We need to filter by created_at >= start_of_month
-    # Note: SQLModel might need specific syntax for datetime comparison depending on DB, but standard operators usually work
-    # We'll fetch count using func.count
     statement = select(func.count(Conversation.id)).where(
         Conversation.user_id == user.id,
         Conversation.created_at >= start_of_month
@@ -53,6 +45,14 @@ async def create_conversation(
             status_code=403, 
             detail=f"Monthly conversation limit reached ({count}/{friendly_limit}). Upgrade to create more."
         )
+
+@router.post("/", response_model=ConversationResponse)
+async def create_conversation(
+    data: ConversationCreate,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+):
+    check_conversation_limit(user, session)
 
     # If a title (first message) is provided, generate a chat name
     if data.title:
@@ -282,28 +282,7 @@ async def generate_personas_api(
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
 
-    # LIMIT CHECK: Threads per month (Check again here since this creates a conversation)
-    limit = 3
-    if user.account_type == 1:
-        limit = 20
-    elif user.account_type >= 2:
-        limit = 9999
-        
-    now = datetime.now(timezone.utc)
-    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    statement = select(func.count(Conversation.id)).where(
-        Conversation.user_id == user.id,
-        Conversation.created_at >= start_of_month
-    )
-    count = session.exec(statement).one()
-    
-    if count >= limit:
-        friendly_limit = "Unlimited" if limit > 100 else limit
-        raise HTTPException(
-            status_code=403, 
-            detail=f"Monthly conversation limit reached ({count}/{friendly_limit}). Upgrade to create more."
-        )
+    check_conversation_limit(user, session)
 
     # Create conversation
     conv = Conversation(user_id=user.id, title=text[:50])
