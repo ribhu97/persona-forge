@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { UserStatus } from '@/components/auth/UserStatus';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PricingPage } from '@/components/pricing/PricingPage';
+import { Button } from '@/components/ui/button';
 
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -35,6 +37,7 @@ function App() {
 
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
@@ -140,6 +143,14 @@ function App() {
     checkAuth();
   }, [checkAuth]);
 
+  // Handle logout cleanup
+  useEffect(() => {
+    if (!isAuthenticated) {
+      useChatStore.getState().reset();
+      usePersonaStore.getState().clearAll();
+    }
+  }, [isAuthenticated]);
+
   // Handle view transitions
   useEffect(() => {
     if ((personas.length > 0 || currentConversationId) && !shouldShowSplit) {
@@ -190,7 +201,15 @@ function App() {
 
   const leftPanel = isInitialState ? (
     <div className="h-full w-full bg-background relative flex flex-col">
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowPricing(true)}
+          className="text-muted-foreground hover:text-foreground font-medium"
+        >
+          Pricing
+        </Button>
         <UserStatus onLoginClick={() => setIsAuthDialogOpen(true)} />
       </div>
 
@@ -241,6 +260,19 @@ function App() {
       </div>
     </div>
   );
+
+  // If showing pricing, render only the pricing page
+  if (showPricing) {
+    return (
+      <div className="h-screen w-screen overflow-auto bg-background">
+        <PricingPage
+          onClose={() => setShowPricing(false)}
+          isAuthenticated={isAuthenticated}
+          onLogin={() => setIsAuthDialogOpen(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden relative">

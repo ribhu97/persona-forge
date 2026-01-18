@@ -6,14 +6,45 @@ from datetime import datetime, timezone
 
 from src.database import get_session
 from src.models import (
-    User, Conversation, Message, Persona, Demographics, Goal, 
-    Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption
+    User, Conversation, Message, Persona, Demographics, Goal,
+    Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
+    Payment
 )
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
 from src.dependencies import get_current_user
 from src.generator import generate_personas, generate_chat_name
+from sqlalchemy import func
+from datetime import timedelta
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
+
+def check_conversation_limit(user: User, session: Session):
+    # LIMIT CHECK: Threads per month
+    # Free: 3, Plus: 20, Pro: Unlimited (9999)
+    # Account types: 0=Free, 1=Plus, 2=Pro
+    
+    limit = 3
+    if user.account_type == 1:
+        limit = 20
+    elif user.account_type >= 2:
+        limit = 9999
+        
+    # Count conversations in current month
+    now = datetime.now(timezone.utc)
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    statement = select(func.count(Conversation.id)).where(
+        Conversation.user_id == user.id,
+        Conversation.created_at >= start_of_month
+    )
+    count = session.exec(statement).one()
+    
+    if count >= limit:
+        friendly_limit = "Unlimited" if limit > 100 else limit
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Monthly conversation limit reached ({count}/{friendly_limit}). Upgrade to create more."
+        )
 
 @router.post("/", response_model=ConversationResponse)
 async def create_conversation(
@@ -21,6 +52,8 @@ async def create_conversation(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)]
 ):
+    check_conversation_limit(user, session)
+
     # If a title (first message) is provided, generate a chat name
     if data.title:
         try:
@@ -78,6 +111,28 @@ async def send_message(
     conv = session.get(Conversation, conversation_id)
     if not conv or conv.user_id != user.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    # LIMIT CHECK: Messages per thread
+    # Free: 3, Plus: 10, Pro: Unlimited
+    msg_limit = 3
+    if user.account_type == 1:
+        msg_limit = 10
+    elif user.account_type >= 2:
+        msg_limit = 9999
+        
+    # Count user messages in this conversation
+    statement = select(func.count(Message.id)).where(
+        Message.conversation_id == conversation_id,
+        Message.role == "user"
+    )
+    msg_count = session.exec(statement).one()
+    
+    if msg_count >= msg_limit:
+        friendly_limit = "Unlimited" if msg_limit > 100 else msg_limit
+        raise HTTPException(
+            status_code=403,
+            detail=f"Message limit for this thread reached ({msg_count}/{friendly_limit}). Upgrade to continue or start a new thread."
+        )
         
     # 1. Save User Message
     user_msg = Message(
@@ -227,6 +282,8 @@ async def generate_personas_api(
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
 
+    check_conversation_limit(user, session)
+
     # Create conversation
     conv = Conversation(user_id=user.id, title=text[:50])
     session.add(conv)
@@ -320,5 +377,16 @@ async def generate_chat_name_api(
         print(f"Error generating chat name: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating chat name: {str(e)}")
 
-
+@router.delete("/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+):
+    conv = session.get(Conversation, conversation_id)
+    if not conv or conv.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     
+    session.delete(conv)
+    session.commit()
+    return {"message": "Conversation deleted"}

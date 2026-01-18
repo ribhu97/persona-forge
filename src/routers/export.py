@@ -21,11 +21,15 @@ from src.dependencies import get_current_user
 router = APIRouter(prefix="/export", tags=["export"])
 
 # Account type constants
+# Account type constants
 ACCOUNT_FREE = 0
-ACCOUNT_ADMIN = 1
+ACCOUNT_PLUS = 1
+ACCOUNT_PRO = 2
+ACCOUNT_ADMIN = 99
 
-# Export rate limit (30 days)
-EXPORT_RATE_LIMIT_DAYS = 30
+# Export rate limit (days)
+EXPORT_LIMIT_FREE = 7
+EXPORT_LIMIT_PLUS = 1
 
 
 def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
@@ -34,7 +38,8 @@ def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
     Returns: (can_export, exports_remaining, next_available_date)
     """
     # Admins have unlimited exports
-    if user.account_type >= ACCOUNT_ADMIN:
+    # Admins and Pro users have unlimited exports
+    if user.account_type >= ACCOUNT_PRO:
         return True, -1, None  # -1 means unlimited
     
     # Free users: check last export date
@@ -47,7 +52,11 @@ def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
         last_export = last_export.replace(tzinfo=timezone.utc)
         
     # Calculate when next export is available
-    next_available = last_export + timedelta(days=EXPORT_RATE_LIMIT_DAYS)
+    days_wait = EXPORT_LIMIT_FREE
+    if user.account_type == ACCOUNT_PLUS:
+        days_wait = EXPORT_LIMIT_PLUS
+        
+    next_available = last_export + timedelta(days=days_wait)
     
     if datetime.now(timezone.utc) >= next_available:
         return True, 1, None
@@ -286,7 +295,7 @@ async def export_personas(
         raise HTTPException(
             status_code=429,
             detail={
-                "message": "Export limit reached. Free accounts can export once per month.",
+                "message": f"Export limit reached. Free accounts can export once every {EXPORT_LIMIT_FREE} days. Plus accounts once every {EXPORT_LIMIT_PLUS} day.",
                 "next_available": next_available.isoformat() if next_available else None
             }
         )

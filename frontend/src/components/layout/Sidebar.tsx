@@ -1,4 +1,4 @@
-import { Plus, MessageSquare, PanelLeftClose, PanelLeftOpen, Box } from 'lucide-react';
+import { Plus, MessageSquare, PanelLeftClose, PanelLeftOpen, Box, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -16,7 +16,8 @@ export function Sidebar({ className }: SidebarProps) {
         currentConversationId,
         fetchConversations,
         selectConversation,
-        clearCurrentConversation
+        clearCurrentConversation,
+        deleteConversation
     } = useChatStore();
 
     const { isAuthenticated } = useAuthStore();
@@ -99,30 +100,47 @@ export function Sidebar({ className }: SidebarProps) {
                         <TooltipProvider key={conv.id}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button
-                                        onClick={() => selectConversation(conv.id)}
-                                        className={cn(
-                                            "flex items-center gap-3 rounded-md transition-colors",
-                                            isCollapsed
-                                                ? "w-10 h-10 justify-center mx-auto"
-                                                : "w-full px-3 py-3 text-left",
-                                            currentConversationId === conv.id
-                                                ? "bg-accent text-accent-foreground"
-                                                : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <MessageSquare className="w-4 h-4 shrink-0" />
+                                    <div className="relative group w-full">
+                                        <button
+                                            onClick={() => selectConversation(conv.id)}
+                                            className={cn(
+                                                "flex items-center gap-3 rounded-md transition-colors",
+                                                isCollapsed
+                                                    ? "w-10 h-10 justify-center mx-auto"
+                                                    : "w-full px-3 py-3 text-left",
+                                                currentConversationId === conv.id
+                                                    ? "bg-accent text-accent-foreground"
+                                                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <MessageSquare className="w-4 h-4 shrink-0" />
+                                            {!isCollapsed && (
+                                                <div className="flex-1 truncate min-w-0 pr-6">
+                                                    <span className="font-medium block truncate">
+                                                        {conv.title || "New Conversation"}
+                                                    </span>
+                                                    <span className="text-xs opacity-70 block">
+                                                        {new Date(conv.last_message_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </button>
                                         {!isCollapsed && (
-                                            <div className="flex-1 truncate min-w-0">
-                                                <span className="font-medium block truncate">
-                                                    {conv.title || "New Conversation"}
-                                                </span>
-                                                <span className="text-xs opacity-70 block">
-                                                    {new Date(conv.last_message_at).toLocaleDateString()}
-                                                </span>
-                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 hover:bg-red-50"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm("Are you sure you want to delete this conversation?")) {
+                                                        deleteConversation(conv.id);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
                                         )}
-                                    </button>
+                                    </div>
                                 </TooltipTrigger>
                                 {isCollapsed && (
                                     <TooltipContent side="right">
