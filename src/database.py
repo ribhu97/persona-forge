@@ -34,6 +34,15 @@ def create_db_and_tables():
         if 'account_type' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN account_type INTEGER DEFAULT 0")
             print("Successfully added account_type column to users table")
+
+        if 'subscription_active' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN subscription_active BOOLEAN DEFAULT 0")
+            print("Successfully added subscription_active column to users table")
+
+        if 'subscription_expires_at' not in columns:
+            # SQLite handles datetime as strings/integers, so we don't need special default here
+            cursor.execute("ALTER TABLE users ADD COLUMN subscription_expires_at DATETIME")
+            print("Successfully added subscription_expires_at column to users table")
             
         if 'last_export_at' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN last_export_at DATETIME")
