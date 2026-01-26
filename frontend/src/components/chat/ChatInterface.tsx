@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User as UserIcon, Loader2, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
+import { LimitBanner } from '@/components/ui/LimitBanner';
 
 interface ChatInterfaceProps {
     className?: string;
@@ -108,8 +109,17 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                 )}
 
                 {error && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mx-auto max-w-3xl">
-                        {error}
+                    <div className="mx-auto max-w-3xl">
+                        {error.toLowerCase().includes('limit') ? (
+                            <LimitBanner
+                                message={error}
+                                onUpgradeClick={() => window.location.href = '/?pricing=true'}
+                            />
+                        ) : (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                                {error}
+                            </div>
+                        )}
                     </div>
                 )}
 

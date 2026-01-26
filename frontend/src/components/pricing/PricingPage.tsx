@@ -152,7 +152,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                     // We could fill user details here if available
                 },
                 theme: {
-                    color: "#000000"
+                    color: "#6B7A63"
                 }
             };
 
@@ -207,7 +207,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                             onClick={() => setCurrency(currency === 'USD' ? 'INR' : 'USD')}
                             className={cn(
                                 "relative inline-flex h-8 w-16 items-center rounded-full transition-all duration-300 ease-in-out cursor-pointer",
-                                currency === 'USD' ? "bg-blue-500/10 border-blue-500/30" : "bg-emerald-500/10 border-emerald-500/30",
+                                "bg-primary/10 border-primary/30",
                                 "border-2 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                             )}
                             aria-label="Toggle currency"
@@ -215,7 +215,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                             <span
                                 className={cn(
                                     "inline-block h-6 w-6 transform rounded-full shadow-lg transition-all duration-300 ease-in-out",
-                                    currency === 'USD' ? "bg-blue-600 translate-x-1" : "bg-emerald-600 translate-x-8"
+                                    currency === 'USD' ? "bg-primary translate-x-1" : "bg-primary translate-x-8"
                                 )}
                             />
                         </button>
@@ -242,7 +242,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                         >
                             {tier.badge && (
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[30]">
-                                    <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-black text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] whitespace-nowrap border border-white/10">
+                                    <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(107,122,99,0.3)] whitespace-nowrap border border-primary/20">
                                         {tier.badge}
                                     </span>
                                 </div>

@@ -47,22 +47,22 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
                         <div className="flex items-center gap-2">
                             <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
                             {user?.account_type === AccountType.PLUS && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-full border border-blue-200">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded-full border border-primary/30">
                                     PLUS
                                 </span>
                             )}
                             {user?.account_type === AccountType.PRO && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full border border-amber-200">
                                     PRO
                                 </span>
                             )}
                             {user?.account_type === AccountType.ADMIN && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary text-primary-foreground rounded-full border border-primary/50">
                                     ADMIN
                                 </span>
                             )}
                             {user?.account_type === AccountType.FREE && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gray-100 text-gray-600 rounded-full border border-gray-200">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground rounded-full border border-border">
                                     FREE
                                 </span>
                             )}

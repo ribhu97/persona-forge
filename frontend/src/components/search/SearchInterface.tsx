@@ -98,7 +98,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
       {/* Integrated Search Bar */}
       <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto transition-all duration-500 ease-out">
         <div className="relative">
-          <div className="relative bg-background border-2 border-border rounded-2xl p-6 shadow-soft hover:shadow-medium focus-within:border-black focus-within:shadow-strong transition-all duration-300 ease-out">
+          <div className="relative bg-background border-2 border-border rounded-2xl p-6 shadow-soft hover:shadow-medium focus-within:border-primary focus-within:shadow-strong transition-all duration-300 ease-out">
             {/* Main Input Area */}
             <Textarea
               value={input}
@@ -206,8 +206,8 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                   className={cn(
                     "h-9 px-6 font-semibold transition-all duration-200 ease-out rounded-lg",
                     hasContent && !isLoading
-                      ? "bg-black hover:bg-gray-800 text-white shadow-medium hover:shadow-strong"
-                      : "bg-primary hover:bg-primary/90 shadow-soft"
+                      ? "bg-primary hover:bg-primary/80 text-primary-foreground shadow-medium hover:shadow-strong"
+                      : "bg-primary/60 hover:bg-primary/70 text-primary-foreground shadow-soft"
                   )}
                 >
                   {isLoading ? (
