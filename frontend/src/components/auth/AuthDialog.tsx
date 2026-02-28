@@ -146,7 +146,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
                         {mode === 'signup' && signupStep === 'otp' ? (
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">OTP Code</label>
+                                <label className="text-sm font-mono tracking-widest uppercase">OTP Code</label>
                                 <Input
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value)}
@@ -158,7 +158,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                             <>
                                 {mode === 'signup' && (
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Name</label>
+                                        <label className="text-sm font-mono tracking-widest uppercase">Name</label>
                                         <Input
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
@@ -169,7 +169,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                 )}
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Email</label>
+                                    <label className="text-sm font-mono tracking-widest uppercase">Email</label>
                                     <Input
                                         type="email"
                                         value={email}
@@ -181,7 +181,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Password</label>
+                                    <label className="text-sm font-mono tracking-widest uppercase">Password</label>
                                     <Input
                                         type="password"
                                         value={password}
@@ -197,7 +197,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                 <span className="w-full border-t" />
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">
+                                <span className="bg-white px-2 text-muted-foreground font-mono tracking-widest">
                                     Or continue with
                                 </span>
                             </div>

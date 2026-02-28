@@ -1,53 +1,85 @@
 @import "tailwindcss";
 
-:root {
-  --background: 0 0% 100%;
-  --foreground: 220 13% 18%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 13% 18%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 220 13% 18%;
-  --primary: 220 13% 18%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 13% 18%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 220 9% 96%;
-  --muted-foreground: 220 8% 46%;
-  --accent: 220 9% 96%;
-  --accent-foreground: 220 13% 18%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 220 13% 18%;
-  --radius: 0.75rem;
-  --title-gradient-from: 220 13% 18%;
-  --title-gradient-to: 220 13% 35%;
+/* Tailwind v4 Theme Registration */
+@theme {
+  --font-sans: 'Space Mono', monospace;
+  --font-display: 'VT323', monospace;
+  --font-mono: 'Share Tech Mono', monospace;
 }
 
+:root {
+  /* Pehloo Brand Palette */
+  /* --white: #f5f2eb -> hsl(42, 33%, 94%) */
+  --background: 42 33% 94%;
+  /* --black: #0a0a0a -> hsl(0, 0%, 4%) */
+  --foreground: 0 0% 4%;
+
+  /* --card: #faf7f2 -> hsl(40, 33%, 96%) */
+  --card: 40 33% 96%;
+  --card-foreground: 0 0% 4%;
+
+  --popover: 40 33% 96%;
+  --popover-foreground: 0 0% 4%;
+
+  /* --accent: #1a1a1a -> hsl(0, 0%, 10%) */
+  --primary: 0 0% 10%;
+  --primary-foreground: 42 33% 94%;
+
+  /* --grid: #e8e4dc -> hsl(40, 21%, 88%) */
+  --secondary: 40 21% 88%;
+  --secondary-foreground: 0 0% 4%;
+
+  /* --muted: #888880 -> hsl(60, 4%, 52%) */
+  --muted: 60 4% 52%;
+  --muted-foreground: 60 4% 30%;
+
+  --accent: 40 21% 88%;
+  --accent-foreground: 0 0% 4%;
+
+  /* --red: #c0392b -> hsl(6, 68%, 46%) */
+  --destructive: 6 68% 46%;
+  --destructive-foreground: 42 33% 94%;
+
+  /* --border: #c8c4bc -> hsl(40, 9%, 76%) */
+  --border: 40 9% 76%;
+  --input: 40 9% 76%;
+  --ring: 0 0% 10%;
+
+  --radius: 0rem;
+
+  /* Additional Brand Colors */
+  --color-green: 145 63% 42%;
+  /* #27ae60 */
+  --color-amber: 43 80% 46%;
+  /* #d4a017 */
+  --color-blue: 210 65% 29%;
+  /* #1a4a7a */
+  --color-grid: 40 21% 88%;
+  /* #e8e4dc */
+}
+
+/* Remove dark mode override to forcefully adopt brand standard or translate appropriately */
 .dark {
-  --background: 220 13% 18%;
-  --foreground: 0 0% 100%;
-  --card: 220 13% 18%;
-  --card-foreground: 0 0% 100%;
-  --popover: 220 13% 18%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 0% 100%;
-  --primary-foreground: 220 13% 18%;
-  --secondary: 220 9% 96%;
-  --secondary-foreground: 220 13% 18%;
-  --muted: 220 9% 96%;
-  --muted-foreground: 220 8% 46%;
-  --accent: 220 9% 96%;
-  --accent-foreground: 220 13% 18%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 0 0% 100%;
-  --radius: 0.75rem;
-  --title-gradient-from: 0 0% 100%;
-  --title-gradient-to: 0 0% 80%;
+  --background: 0 0% 4%;
+  --foreground: 42 33% 94%;
+  --card: 0 0% 8%;
+  --card-foreground: 42 33% 94%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 42 33% 94%;
+  --primary: 42 33% 94%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 42 33% 94%;
+  --muted: 0 0% 20%;
+  --muted-foreground: 40 9% 76%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 42 33% 94%;
+  --destructive: 6 68% 46%;
+  --destructive-foreground: 42 33% 94%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 42 33% 94%;
+  --color-grid: 0 0% 12%;
 }
 
 * {
@@ -57,11 +89,31 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  font-variation-settings: normal;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background-image:
+    linear-gradient(hsl(var(--color-grid)) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--color-grid)) 1px, transparent 1px);
+  background-size: 32px 32px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apply VT323 to headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-display {
+  font-family: 'VT323', monospace;
+  font-weight: normal;
+}
+
+.font-mono {
+  font-family: 'Share Tech Mono', monospace;
 }
 
 /* Custom scrollbar */

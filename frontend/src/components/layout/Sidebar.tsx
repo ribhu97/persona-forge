@@ -1,7 +1,9 @@
-import { Plus, MessageSquare, PanelLeftClose, PanelLeftOpen, Box, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, PanelLeftClose, Trash2 } from 'lucide-react';
+import { PehlooLogo } from '@/components/ui/PehlooLogo';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
+import { usePersonaStore } from '@/stores/personaStore';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -22,7 +24,6 @@ export function Sidebar({ className }: SidebarProps) {
 
     const { isAuthenticated } = useAuthStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [isHoveringLogo, setIsHoveringLogo] = useState(false);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -30,8 +31,11 @@ export function Sidebar({ className }: SidebarProps) {
         }
     }, [fetchConversations, isAuthenticated]);
 
+    const { clearAll } = usePersonaStore();
+
     const handleNewChat = () => {
         clearCurrentConversation();
+        clearAll();
     };
 
     return (
@@ -47,22 +51,16 @@ export function Sidebar({ className }: SidebarProps) {
             <div className={cn("p-4 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
                 <div
                     className="relative cursor-pointer flex items-center gap-2"
-                    onMouseEnter={() => setIsHoveringLogo(true)}
-                    onMouseLeave={() => setIsHoveringLogo(false)}
                     onClick={() => setIsCollapsed(!isCollapsed)}
                 >
                     {isCollapsed ? (
-                        <div className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors hidden md:flex">
-                            {isHoveringLogo ? (
-                                <PanelLeftOpen className="w-5 h-5 text-muted-foreground" />
-                            ) : (
-                                <Box className="w-6 h-6 text-primary" />
-                            )}
+                        <div className="w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors hidden md:flex">
+                            <PehlooLogo size={24} />
                         </div>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <Box className="w-6 h-6 text-primary" />
-                            <span className="font-bold text-lg">Pehloo</span>
+                            <PehlooLogo size={24} />
+                            <span className="font-display text-lg tracking-tight">PEHLOO</span>
                         </div>
                     )}
                 </div>

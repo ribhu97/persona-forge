@@ -143,6 +143,13 @@ function App() {
     checkAuth();
   }, [checkAuth]);
 
+  // Listen for custom event to open pricing page without reload
+  useEffect(() => {
+    const handleOpenPricing = () => setShowPricing(true);
+    window.addEventListener('openPricing', handleOpenPricing);
+    return () => window.removeEventListener('openPricing', handleOpenPricing);
+  }, []);
+
   // Handle logout cleanup
   useEffect(() => {
     if (!isAuthenticated) {
