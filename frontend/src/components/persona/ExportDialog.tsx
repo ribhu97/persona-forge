@@ -187,7 +187,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
 
                             {/* Format Selection */}
                             <div className="space-y-3">
-                                <label className="text-sm font-medium">Select Format</label>
+                                <label className="text-sm font-mono tracking-widest uppercase">Select Format</label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         type="button"

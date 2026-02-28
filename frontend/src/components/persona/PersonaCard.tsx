@@ -212,7 +212,7 @@ export function PersonaCard({
             </h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <label className="text-muted-foreground text-xs">Age</label>
+                <label className="text-muted-foreground text-xs font-mono tracking-widest uppercase">Age</label>
                 <div className="flex items-center gap-1 mt-1">
                   <InlineEditor
                     value={persona.demographics.age}
@@ -223,7 +223,7 @@ export function PersonaCard({
                 </div>
               </div>
               <div>
-                <label className="text-muted-foreground text-xs">Location</label>
+                <label className="text-muted-foreground text-xs font-mono tracking-widest uppercase">Location</label>
                 <div className="flex items-center gap-1 mt-1">
                   <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                   <InlineEditor
@@ -235,7 +235,7 @@ export function PersonaCard({
                 </div>
               </div>
               <div>
-                <label className="text-muted-foreground text-xs">Education</label>
+                <label className="text-muted-foreground text-xs font-mono tracking-widest uppercase">Education</label>
                 <div className="flex items-center gap-1 mt-1">
                   <GraduationCap className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                   <InlineEditor
@@ -247,7 +247,7 @@ export function PersonaCard({
                 </div>
               </div>
               <div>
-                <label className="text-muted-foreground text-xs">Industry</label>
+                <label className="text-muted-foreground text-xs font-mono tracking-widest uppercase">Industry</label>
                 <div className="flex items-center gap-1 mt-1">
                   <Briefcase className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                   <InlineEditor

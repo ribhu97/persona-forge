@@ -152,7 +152,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                     // We could fill user details here if available
                 },
                 theme: {
-                    color: "#6B7A63"
+                    color: "#0a0a0a"
                 }
             };
 
@@ -188,8 +188,8 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="text-center space-y-4 mb-12">
-                    <h1 className="text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent pb-2 font-display">
-                        Simple, Transparent Pricing
+                    <h1 className="text-4xl sm:text-5xl tracking-tight text-foreground pb-2 font-display">
+                        SIMPLE, TRANSPARENT PRICING
                     </h1>
                     <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
                         Choose the plan that fits your needs. Upgrade or downgrade anytime.
@@ -198,30 +198,30 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                     {/* Currency Toggle */}
                     <div className="flex items-center justify-center gap-3 pt-4">
                         <span className={cn(
-                            "text-sm font-medium transition-colors",
-                            currency === 'USD' ? 'text-foreground' : 'text-muted-foreground'
+                            "text-sm font-mono font-bold tracking-widest uppercase transition-colors duration-300",
+                            currency === 'USD' ? 'text-[#1a4a7a]' : 'text-muted-foreground'
                         )}>
                             USD ($)
                         </span>
                         <button
                             onClick={() => setCurrency(currency === 'USD' ? 'INR' : 'USD')}
                             className={cn(
-                                "relative inline-flex h-8 w-16 items-center rounded-full transition-all duration-300 ease-in-out cursor-pointer",
-                                "bg-primary/10 border-primary/30",
-                                "border-2 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                "relative inline-flex h-8 w-16 items-center transition-all duration-300 ease-in-out cursor-pointer",
+                                "border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                                currency === 'USD' ? 'bg-[#1a4a7a]/20 border-[#1a4a7a]' : 'bg-[#27ae60]/20 border-[#27ae60]'
                             )}
                             aria-label="Toggle currency"
                         >
                             <span
                                 className={cn(
-                                    "inline-block h-6 w-6 transform rounded-full shadow-lg transition-all duration-300 ease-in-out",
-                                    currency === 'USD' ? "bg-primary translate-x-1" : "bg-primary translate-x-8"
+                                    "inline-block h-6 w-6 transform transition-all duration-300 ease-in-out",
+                                    currency === 'USD' ? 'bg-[#1a4a7a] translate-x-1' : 'bg-[#27ae60] translate-x-8'
                                 )}
                             />
                         </button>
                         <span className={cn(
-                            "text-sm font-medium transition-colors",
-                            currency === 'INR' ? 'text-foreground' : 'text-muted-foreground'
+                            "text-sm font-mono font-bold tracking-widest uppercase transition-colors duration-300",
+                            currency === 'INR' ? 'text-[#27ae60]' : 'text-muted-foreground'
                         )}>
                             INR (₹)
                         </span>
@@ -234,15 +234,15 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                         <Card
                             key={tier.name}
                             className={cn(
-                                "relative flex flex-col transition-all duration-300 ease-out hover:shadow-strong",
+                                "relative flex flex-col transition-all duration-300 ease-out",
                                 tier.highlighted
-                                    ? "border-2 border-primary shadow-strong scale-[1.05] ring-4 ring-primary/5 z-10"
-                                    : "border border-border shadow-soft hover:border-primary/50"
+                                    ? "border-2 border-foreground scale-[1.02] z-10"
+                                    : "border border-border hover:border-foreground"
                             )}
                         >
                             {tier.badge && (
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[30]">
-                                    <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(107,122,99,0.3)] whitespace-nowrap border border-primary/20">
+                                    <span className="inline-flex items-center px-4 py-1.5 text-xs font-mono font-bold tracking-widest uppercase bg-[#0a0a0a] text-[#f5f2eb] whitespace-nowrap border-2 border-[#0a0a0a]">
                                         {tier.badge}
                                     </span>
                                 </div>
@@ -250,9 +250,9 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
 
                             <CardHeader className="text-center pb-2">
                                 <div className={cn(
-                                    "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full",
+                                    "mx-auto mb-4 flex h-14 w-14 items-center justify-center",
                                     tier.highlighted
-                                        ? "bg-primary text-primary-foreground"
+                                        ? "bg-foreground text-background"
                                         : "bg-muted text-foreground"
                                 )}>
                                     {tier.icon}
@@ -264,7 +264,10 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                             <CardContent className="flex-1 space-y-6">
                                 {/* Price */}
                                 <div className="text-center">
-                                    <span className="text-4xl font-extrabold tracking-tight">
+                                    <span className={cn(
+                                        "text-4xl font-extrabold tracking-tight transition-colors duration-300",
+                                        currency === 'USD' ? 'text-[#1a4a7a]' : 'text-[#27ae60]'
+                                    )}>
                                         {tier.price[currency]}
                                     </span>
                                     <span className="text-muted-foreground font-medium">{tier.period}</span>
@@ -274,7 +277,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                                 <ul className="space-y-3">
                                     {tier.features.map((feature, index) => (
                                         <li key={index} className="flex items-start gap-3">
-                                            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                                            <Check className="h-5 w-5 text-[#27ae60] shrink-0 mt-0.5" />
                                             <span className="text-sm text-foreground">{feature}</span>
                                         </li>
                                     ))}
@@ -304,7 +307,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
                 </div>
 
                 {/* Lifetime Offer Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20 p-6 sm:p-8">
+                <div className="relative overflow-hidden bg-card border-2 border-foreground p-6 sm:p-8">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.1),transparent_50%)]" />
                     <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-4">
@@ -323,10 +326,13 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
 
                         <div className="flex items-center gap-6">
                             <div className="text-center sm:text-right">
-                                <div className="text-3xl font-extrabold text-foreground">
+                                <div className={cn(
+                                    "text-3xl font-extrabold transition-colors duration-300",
+                                    currency === 'USD' ? 'text-[#1a4a7a]' : 'text-[#27ae60]'
+                                )}>
                                     {LIFETIME_OFFER.price[currency]}
                                 </div>
-                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                <div className="text-sm text-[#27ae60] font-medium">
                                     {LIFETIME_OFFER.savings[currency]} vs monthly
                                 </div>
                             </div>
