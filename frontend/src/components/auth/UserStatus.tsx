@@ -9,6 +9,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/authStore';
+import { AccountType } from '@/types/auth'; // Import AccountType
+
+// I'll use a styled span for simplicity as I didn't check for Badge component.
 
 interface UserStatusProps {
     onLoginClick: () => void;
@@ -41,7 +44,29 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
             >
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
+                            {user?.account_type === AccountType.PLUS && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded-full border border-primary/30">
+                                    PLUS
+                                </span>
+                            )}
+                            {user?.account_type === AccountType.PRO && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full border border-amber-200">
+                                    PRO
+                                </span>
+                            )}
+                            {user?.account_type === AccountType.ADMIN && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary text-primary-foreground rounded-full border border-primary/50">
+                                    ADMIN
+                                </span>
+                            )}
+                            {user?.account_type === AccountType.FREE && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground rounded-full border border-border">
+                                    FREE
+                                </span>
+                            )}
+                        </div>
                         <p className="text-xs leading-none text-muted-foreground">
                             {user?.email}
                         </p>

@@ -151,7 +151,10 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                                 </p>
                                             )}
                                             <div className="pt-2">
-                                                <button className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2">
+                                                <button
+                                                    onClick={() => window.dispatchEvent(new CustomEvent('openPricing'))}
+                                                    className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
+                                                >
                                                     Upgrade to unlock unlimited exports →
                                                 </button>
                                             </div>
@@ -184,7 +187,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
 
                             {/* Format Selection */}
                             <div className="space-y-3">
-                                <label className="text-sm font-medium">Select Format</label>
+                                <label className="text-sm font-mono tracking-widest uppercase">Select Format</label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         type="button"

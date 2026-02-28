@@ -15,6 +15,8 @@ interface ChatStore {
     selectConversation: (id: number) => Promise<void>;
     sendMessage: (content: string) => Promise<void>;
     clearCurrentConversation: () => void;
+    deleteConversation: (id: number) => Promise<void>;
+    reset: () => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -113,5 +115,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     clearCurrentConversation: () => {
         set({ currentConversationId: null, messages: [] });
+    },
+
+    deleteConversation: async (id: number) => {
+        try {
+            await chatAPI.deleteConversation(id);
+            set(state => ({
+                conversations: state.conversations.filter(c => c.id !== id),
+                currentConversationId: state.currentConversationId === id ? null : state.currentConversationId,
+                messages: state.currentConversationId === id ? [] : state.messages
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+
+    reset: () => {
+        set({
+            conversations: [],
+            currentConversationId: null,
+            messages: [],
+            error: null,
+            isLoading: false
+        });
     }
 }));

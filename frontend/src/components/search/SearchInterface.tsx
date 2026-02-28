@@ -87,8 +87,8 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
     )}>
       {/* Header */}
       <div className="text-center space-y-6 transition-all duration-500 ease-out">
-        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--title-gradient-from))] to-[hsl(var(--title-gradient-to))] bg-clip-text text-transparent transition-all duration-500 pb-2 ease-out font-display">
-          Persona Forge
+        <h1 className="text-6xl tracking-tight text-foreground transition-all duration-500 pb-2 ease-out font-display">
+          PERSONA FORGE
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed transition-all duration-500 ease-out">
           Describe your product or service to generate detailed user personas powered by AI
@@ -98,7 +98,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
       {/* Integrated Search Bar */}
       <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto transition-all duration-500 ease-out">
         <div className="relative">
-          <div className="relative bg-background border-2 border-border rounded-2xl p-6 shadow-soft hover:shadow-medium focus-within:border-black focus-within:shadow-strong transition-all duration-300 ease-out">
+          <div className="relative bg-background border-2 border-border p-6 hover:border-black dark:hover:border-white focus-within:border-primary transition-all duration-300 ease-out">
             {/* Main Input Area */}
             <Textarea
               value={input}
@@ -151,8 +151,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowModeDropdown(!showModeDropdown)}
-                    className="h-9 px-4 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-out rounded-lg"
-                    disabled={isLoading}
+                    className="h-9 px-4 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-out"
                   >
                     <span className="mr-2">{selectedMode.icon}</span>
                     {selectedMode.label}
@@ -161,7 +160,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
 
                   {/* Dropdown Menu */}
                   {showModeDropdown && (
-                    <div className="absolute top-full left-0 mt-3 w-52 bg-background border border-border rounded-xl shadow-strong z-50 animate-in fade-in slide-in-from-top-2 duration-200 ease-out backdrop-blur-sm">
+                    <div className="absolute top-full left-0 mt-3 w-52 bg-background border border-border z-50 animate-in fade-in slide-in-from-top-2 duration-200 ease-out backdrop-blur-sm">
                       {Object.entries(GENERATION_MODES).map(([key, modeOption]) => {
                         const isSelected = key === mode;
                         const isDisabled = modeOption.disabled;
@@ -177,7 +176,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                             }}
                             disabled={isDisabled}
                             className={cn(
-                              "w-full px-4 py-3 text-left text-sm font-medium hover:bg-muted transition-all duration-200 ease-out rounded-lg mx-2 my-1",
+                              "w-full px-4 py-3 text-left text-sm font-medium hover:bg-muted transition-all duration-200 ease-out mx-2 my-1",
                               "flex items-center gap-3",
                               isSelected && "bg-primary/10 text-primary",
                               isDisabled && "opacity-50 cursor-not-allowed",
@@ -204,10 +203,10 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
                   disabled={!hasContent || isLoading}
                   size="sm"
                   className={cn(
-                    "h-9 px-6 font-semibold transition-all duration-200 ease-out rounded-lg",
+                    "h-9 px-6 font-semibold transition-all duration-200 ease-out",
                     hasContent && !isLoading
-                      ? "bg-black hover:bg-gray-800 text-white shadow-medium hover:shadow-strong"
-                      : "bg-primary hover:bg-primary/90 shadow-soft"
+                      ? "bg-primary hover:bg-primary/80 text-primary-foreground"
+                      : "bg-primary/60 hover:bg-primary/70 text-primary-foreground"
                   )}
                 >
                   {isLoading ? (
@@ -250,7 +249,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
               key={example}
               onClick={() => setInput(example)}
               disabled={isLoading}
-              className="text-sm px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-full transition-all duration-200 ease-out font-medium shadow-soft hover:shadow-medium"
+              className="text-sm px-4 py-2 bg-secondary hover:bg-secondary/80 transition-all duration-200 ease-out font-mono font-bold tracking-[0.1em] uppercase"
             >
               {example}
             </button>

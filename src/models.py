@@ -10,13 +10,30 @@ class User(SQLModel, table=True):
     auth_provider: str = Field(default="email") # email or google
     name: Optional[str] = None
     is_verified: bool = Field(default=False)
-    account_type: int = Field(default=0)  # 0=Free, 1=Admin, future: 2=Pro, 3=Enterprise
-    last_export_at: Optional[datetime] = Field(default=None, index=True)  # Track monthly export limit
+    # Account types: 0=Free, 1=Plus, 2=Pro
+    account_type: int = Field(default=0)
+    subscription_active: bool = Field(default=False)
+    subscription_expires_at: Optional[datetime] = Field(default=None)
+    last_export_at: Optional[datetime] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     otps: List["OneTimePassword"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     conversations: List["Conversation"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
     personas: List["Persona"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+    payments: List["Payment"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete"})
+
+class Payment(SQLModel, table=True):
+    __tablename__ = "payments"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
+    razorpay_order_id: str = Field(index=True)
+    razorpay_payment_id: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: str # created, paid, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    user: User = Relationship(back_populates="payments")
 
 class OneTimePassword(SQLModel, table=True):
     __tablename__ = "one_time_passwords"

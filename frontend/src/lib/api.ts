@@ -127,9 +127,13 @@ export const chatAPI = {
     return response.data;
   },
 
-  sendMessage: async (conversationId: number, content: string): Promise<any> => {
-    const response = await apiClient.post(`/conversations/${conversationId}/messages`, { content });
+  sendMessage: async (conversation_id: number, content: string): Promise<any> => {
+    const response = await apiClient.post(`/conversations/${conversation_id}/messages`, { content });
     return response.data;
+  },
+
+  deleteConversation: async (conversationId: number): Promise<void> => {
+    await apiClient.delete(`/conversations/${conversationId}`);
   }
 };
 
@@ -144,6 +148,22 @@ export const exportAPI = {
       { format, persona_ids: personaIds },
       { responseType: 'blob' }
     );
+    return response.data;
+  }
+};
+
+export const paymentAPI = {
+  createOrder: async (planType: string, amount: number, currency: string): Promise<any> => {
+    const response = await apiClient.post('/payments/create-order', {
+      amount,
+      currency,
+      plan_type: planType
+    });
+    return response.data;
+  },
+
+  verifyPayment: async (data: any): Promise<any> => {
+    const response = await apiClient.post('/payments/verify-payment', data);
     return response.data;
   }
 };

@@ -10,8 +10,9 @@ export interface User {
 // Account type constants for clarity
 export const AccountType = {
     FREE: 0,
-    ADMIN: 1,
-    // Future: PRO: 2, ENTERPRISE: 3
+    PLUS: 1,
+    PRO: 2,
+    ADMIN: 99,
 } as const;
 
 export interface LoginResponse {
