@@ -113,7 +113,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                         {error.toLowerCase().includes('limit') ? (
                             <LimitBanner
                                 message={error}
-                                onUpgradeClick={() => window.location.href = '/?pricing=true'}
+                                onUpgradeClick={() => window.dispatchEvent(new CustomEvent('openPricing'))}
                             />
                         ) : (
                             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

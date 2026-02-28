@@ -152,7 +152,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                             )}
                                             <div className="pt-2">
                                                 <button
-                                                    onClick={() => window.location.href = '/?pricing=true'}
+                                                    onClick={() => window.dispatchEvent(new CustomEvent('openPricing'))}
                                                     className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
                                                 >
                                                     Upgrade to unlock unlimited exports →

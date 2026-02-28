@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 interface PehlooLogoProps {
@@ -45,6 +45,13 @@ export function PehlooLogo({ className, size = 32 }: PehlooLogoProps) {
             setIsFlickering(false);
             setShowSad(false);
         }, 1000);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (flickerRef.current) clearInterval(flickerRef.current);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
     }, []);
 
     return (
