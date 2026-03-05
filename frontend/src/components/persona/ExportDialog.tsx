@@ -45,7 +45,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
     };
 
     const handleExport = async () => {
-        if (!exportStatus?.can_export || personas.length === 0) return;
+        if (!canExport || personas.length === 0) return;
 
         setIsExporting(true);
         setError(null);
@@ -108,7 +108,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
     };
 
     const isAdmin = exportStatus?.account_type === AccountType.ADMIN;
-    const canExport = exportStatus?.can_export ?? false;
+    const canExport = (exportStatus?.can_export ?? false) || isAdmin;
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>

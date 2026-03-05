@@ -92,6 +92,27 @@ class PersonaResponse(BaseModel):
     
     model_config = {"from_attributes": True}
 
+class DemographicsUpdate(BaseModel):
+    age: Optional[str] = None
+    location: Optional[str] = None
+    education: Optional[str] = None
+    industry: Optional[str] = None
+
+class PersonaUpdate(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    role: Optional[str] = None
+    tech_comfort: Optional[str] = None
+    scenario_context: Optional[str] = None
+    demographics: Optional[DemographicsUpdate] = None
+    goals: Optional[List[str]] = None
+    frustrations: Optional[List[str]] = None
+    behavioral_patterns: Optional[List[str]] = None
+    influence_networks: Optional[List[str]] = None
+    recruitment_criteria: Optional[List[str]] = None
+    research_assumptions: Optional[List[str]] = None
+
+
 class MessageResponse(BaseModel):
     id: int
     role: str
