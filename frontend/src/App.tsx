@@ -167,6 +167,7 @@ function App() {
   }, [personas.length, currentConversationId, shouldShowSplit]);
 
   const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
+    const originalPersona = personas.find(p => p.id === id);
     updatePersona(id, updates);
 
     // Don't try to persist local-only duplicates
@@ -178,6 +179,10 @@ function App() {
       await personaAPI.updatePersona(id, updates);
     } catch (err) {
       console.error('Failed to update persona:', err);
+      // Revert optimistic update
+      if (originalPersona) {
+        updatePersona(id, originalPersona);
+      }
     }
   };
 
