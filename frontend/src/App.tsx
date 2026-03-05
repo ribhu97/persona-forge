@@ -11,6 +11,7 @@ import { UserStatus } from '@/components/auth/UserStatus';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PricingPage } from '@/components/pricing/PricingPage';
 import { Button } from '@/components/ui/button';
+import { personaAPI } from '@/lib/api';
 
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -72,7 +73,7 @@ function App() {
           };
 
           return {
-            id: p.id,
+            id: String(p.id),
             name: p.name,
             status: p.status,
             role: p.role,
@@ -165,6 +166,21 @@ function App() {
     }
   }, [personas.length, currentConversationId, shouldShowSplit]);
 
+  const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
+    updatePersona(id, updates);
+
+    // Don't try to persist local-only duplicates
+    if (typeof id === 'string' && id.startsWith('persona-')) {
+      return;
+    }
+
+    try {
+      await personaAPI.updatePersona(id, updates);
+    } catch (err) {
+      console.error('Failed to update persona:', err);
+    }
+  };
+
   const handleClearAll = async () => {
     setIsTransitioning(true);
 
@@ -254,7 +270,7 @@ function App() {
       )}>
         <PersonaPanel
           personas={personas}
-          onUpdatePersona={updatePersona}
+          onUpdatePersona={handleUpdatePersona}
           onDeletePersona={deletePersona}
           onDuplicatePersona={handleDuplicatePersona}
           onClearAll={handleClearAll}

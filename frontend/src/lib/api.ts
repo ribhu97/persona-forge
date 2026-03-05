@@ -7,7 +7,8 @@ import type {
   LoginResponse,
   SignupResponse,
   ExportStatus,
-  ExportFormat
+  ExportFormat,
+  BackendPersona
 } from '@/types';
 
 export const apiClient = axios.create({
@@ -107,6 +108,11 @@ export const personaAPI = {
     const response = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return response.data;
+  },
+
+  updatePersona: async (personaId: string | number, updates: Partial<any>): Promise<BackendPersona> => {
+    const response = await apiClient.put<BackendPersona>(`/personas/${personaId}`, updates);
     return response.data;
   }
 };

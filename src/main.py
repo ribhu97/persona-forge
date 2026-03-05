@@ -12,6 +12,7 @@ from src.routers.auth import router as auth_router
 from src.routers.chat import router as chat_router
 from src.routers.export import router as export_router
 from src.routers.payments import router as payments_router
+from src.routers.personas import router as personas_router
 import uvicorn
 
 @asynccontextmanager
@@ -51,6 +52,7 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(export_router)
 app.include_router(payments_router)
+app.include_router(personas_router)
 
 @app.get("/")
 async def root():
