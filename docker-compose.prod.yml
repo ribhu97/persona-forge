@@ -1,0 +1,76 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: always
+    volumes:
+      - sqlite_data:/app/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:///data/database.db
+      - ALLOWED_ORIGINS=https://personaforge.pehloo.xyz
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+        - VITE_API_URL=https://personaforge.pehloo.xyz/api/v1
+        - VITE_RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-main.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: /bin/sh
+    command: -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $$!; done'
+    networks:
+      - app-network
+  
+  sqlite-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite-admin
+    ports:
+      - "8080:8001"
+    volumes:
+      - sqlite_data:/data
+    command: ["datasette", "/data/database.db", "--root", "--host", "0.0.0.0", "--port", "8001"]
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
+
+networks:
+  app-network:
+    driver: bridge
