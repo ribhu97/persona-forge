@@ -139,3 +139,43 @@ class ExportStatusResponse(BaseModel):
     exports_remaining: int  # For free users: 0 or 1
     last_export_at: Optional[datetime] = None
     next_export_available: Optional[datetime] = None  # When rate limit resets
+
+# Blog Schemas
+class BlogPostResponse(BaseModel):
+    id: int
+    slug: str
+    title: str
+    description: str
+    author: str
+    read_time: str
+    tags: List[str]  # Converted from comma-separated string
+    content: str
+    meta_title: str
+    meta_description: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class BlogPostSummary(BaseModel):
+    """Lighter response for listing (excludes full content)."""
+    id: int
+    slug: str
+    title: str
+    description: str
+    author: str
+    read_time: str
+    tags: List[str]
+    meta_title: str
+    meta_description: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class BlogListResponse(BaseModel):
+    posts: List[BlogPostSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+

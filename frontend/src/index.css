@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@plugin "@tailwindcss/typography";
 /* Tailwind v4 Theme Registration */
 @theme {
   --font-sans: 'Space Mono', monospace;
