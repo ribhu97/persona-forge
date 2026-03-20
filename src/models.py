@@ -154,3 +154,23 @@ class ResearchAssumption(SQLModel, table=True):
     order_index: int
     
     persona: Persona = Relationship(back_populates="research_assumptions")
+
+class BlogPost(SQLModel, table=True):
+    __tablename__ = "blog_posts"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(unique=True, index=True)
+    title: str
+    description: str
+    author: str
+    read_time: str
+    tags: str  # Stored as JSON string
+    content: str  # HTML content
+    meta_title: str
+    meta_description: str
+    is_published: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
+    )
+

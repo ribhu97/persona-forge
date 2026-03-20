@@ -174,3 +174,44 @@ export const paymentAPI = {
     return response.data;
   }
 };
+
+// Blog types matching the backend response
+export interface BlogPostSummary {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  read_time: string;
+  tags: string[];
+  meta_title: string;
+  meta_description: string;
+  created_at: string;
+}
+
+export interface BlogPostFull extends BlogPostSummary {
+  content: string;
+  updated_at: string;
+}
+
+export interface BlogListResponse {
+  posts: BlogPostSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export const blogAPI = {
+  list: async (page = 1, pageSize = 10): Promise<BlogListResponse> => {
+    const response = await apiClient.get<BlogListResponse>('/blog/', {
+      params: { page, page_size: pageSize },
+    });
+    return response.data;
+  },
+
+  getBySlug: async (slug: string): Promise<BlogPostFull> => {
+    const response = await apiClient.get<BlogPostFull>(`/blog/${slug}`);
+    return response.data;
+  },
+};

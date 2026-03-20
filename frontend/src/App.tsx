@@ -10,6 +10,8 @@ import { AuthDialog } from '@/components/auth/AuthDialog';
 import { UserStatus } from '@/components/auth/UserStatus';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PricingPage } from '@/components/pricing/PricingPage';
+import { BlogListPage } from '@/components/blog/BlogListPage';
+import { BlogPostPage } from '@/components/blog/BlogPostPage';
 import { Button } from '@/components/ui/button';
 import { personaAPI } from '@/lib/api';
 
@@ -39,6 +41,8 @@ function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
+  const [showBlog, setShowBlog] = useState(false);
+  const [selectedBlogSlug, setSelectedBlogSlug] = useState<string | null>(null);
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
@@ -139,6 +143,72 @@ function App() {
     }
   }, [selectedVersionId, personaVersions, setPersonas]);
 
+  // Handle URL deep links on mount and popstate
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const params = new URLSearchParams(window.location.search);
+      const page = params.get('page');
+      const slug = params.get('slug');
+
+      if (page === 'blog') {
+        setShowBlog(true);
+        setShowPricing(false);
+        if (slug) {
+          setSelectedBlogSlug(slug);
+        } else {
+          setSelectedBlogSlug(null);
+        }
+      } else if (page === 'pricing') {
+        setShowPricing(true);
+        setShowBlog(false);
+      } else {
+        setShowBlog(false);
+        setShowPricing(false);
+      }
+    };
+
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
+  // Update URL search params when state changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let changed = false;
+
+    if (showBlog) {
+      if (params.get('page') !== 'blog') {
+        params.set('page', 'blog');
+        changed = true;
+      }
+      if (selectedBlogSlug) {
+        if (params.get('slug') !== selectedBlogSlug) {
+          params.set('slug', selectedBlogSlug);
+          changed = true;
+        }
+      } else if (params.has('slug')) {
+        params.delete('slug');
+        changed = true;
+      }
+    } else if (showPricing) {
+      if (params.get('page') !== 'pricing') {
+        params.set('page', 'pricing');
+        if (params.has('slug')) params.delete('slug');
+        changed = true;
+      }
+    } else if (params.has('page')) {
+      params.delete('page');
+      params.delete('slug');
+      changed = true;
+    }
+
+    if (changed) {
+      const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.pushState({}, '', newUrl);
+    }
+  }, [showBlog, selectedBlogSlug, showPricing]);
+
   // Check auth on mount
   useEffect(() => {
     checkAuth();
@@ -233,6 +303,14 @@ function App() {
         <Button
           variant="ghost"
           size="sm"
+          onClick={() => setShowBlog(true)}
+          className="text-muted-foreground hover:text-foreground font-medium"
+        >
+          Blog
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setShowPricing(true)}
           className="text-muted-foreground hover:text-foreground font-medium"
         >
@@ -289,6 +367,33 @@ function App() {
     </div>
   );
 
+  // If showing blog, render blog pages
+  if (showBlog) {
+    if (selectedBlogSlug) {
+      return (
+        <div className="h-screen w-screen overflow-auto bg-background">
+          <BlogPostPage
+            slug={selectedBlogSlug}
+            onBackToList={() => setSelectedBlogSlug(null)}
+            onClose={() => {
+              setShowBlog(false);
+              setSelectedBlogSlug(null);
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-screen w-screen overflow-auto bg-background">
+        <BlogListPage
+          onClose={() => setShowBlog(false)}
+          onSelectPost={(slug) => setSelectedBlogSlug(slug)}
+        />
+      </div>
+    );
+  }
+
   // If showing pricing, render only the pricing page
   if (showPricing) {
     return (
@@ -305,8 +410,28 @@ function App() {
   return (
     <div className="h-screen w-screen overflow-hidden relative">
       <ErrorBoundary>
-        <div className="absolute top-4 right-4 z-50">
-          {!isInitialState && <UserStatus onLoginClick={() => setIsAuthDialogOpen(true)} />}
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+          {!isInitialState && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowBlog(true)}
+                className="text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
+              >
+                Blog
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPricing(true)}
+                className="text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
+              >
+                Pricing
+              </Button>
+              <UserStatus onLoginClick={() => setIsAuthDialogOpen(true)} />
+            </>
+          )}
         </div>
 
         {/* Transition Overlay */}
