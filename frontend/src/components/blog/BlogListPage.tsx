@@ -17,6 +17,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [retryCount, setRetryCount] = useState(0);
 
     useEffect(() => {
         setLoading(true);
@@ -31,7 +32,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                 setError('Failed to load blog posts. Please try again.');
             })
             .finally(() => setLoading(false));
-    }, [page]);
+    }, [page, retryCount]);
 
     return (
         <div className={cn(
@@ -109,7 +110,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setPage(page)}
+                            onClick={() => setRetryCount(c => c + 1)}
                             className="mt-4 font-mono text-[11px] uppercase tracking-widest rounded-none"
                         >
                             ▸ RETRY

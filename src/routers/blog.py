@@ -1,4 +1,5 @@
 import math
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 
@@ -10,8 +11,16 @@ router = APIRouter(prefix="/blog", tags=["blog"])
 
 
 def _to_tags_list(tags_str: str) -> list[str]:
-    """Convert comma-separated tags string to a list."""
-    return [t.strip() for t in tags_str.split(",") if t.strip()]
+    """Convert JSON tags string to a list."""
+    try:
+        if not tags_str:
+            return []
+        # Support fallback to comma-separated list if someone mistakenly added it manually
+        if "[" not in tags_str:
+            return [t.strip() for t in tags_str.split(",") if t.strip()]
+        return json.loads(tags_str)
+    except json.JSONDecodeError:
+        return []
 
 
 def _post_to_summary(post: BlogPost) -> BlogPostSummary:
@@ -54,7 +63,7 @@ def list_blog_posts(
 ):
     """List published blog posts with pagination (public, no auth required)."""
     # Total count
-    count_stmt = select(func.count()).select_from(BlogPost).where(BlogPost.is_published == True)
+    count_stmt = select(func.count()).select_from(BlogPost).where(BlogPost.is_published)
     total = session.exec(count_stmt).one()
 
     total_pages = max(1, math.ceil(total / page_size))
@@ -62,7 +71,7 @@ def list_blog_posts(
 
     stmt = (
         select(BlogPost)
-        .where(BlogPost.is_published == True)
+        .where(BlogPost.is_published)
         .order_by(BlogPost.created_at.desc())
         .offset(offset)
         .limit(page_size)
@@ -81,10 +90,11 @@ def list_blog_posts(
 @router.get("/{slug}", response_model=BlogPostResponse)
 def get_blog_post(slug: str, session: Session = Depends(get_session)):
     """Get a single published blog post by slug (public, no auth required)."""
-    stmt = select(BlogPost).where(BlogPost.slug == slug, BlogPost.is_published == True)
+    stmt = select(BlogPost).where(BlogPost.slug == slug, BlogPost.is_published)
     post = session.exec(stmt).first()
 
     if not post:
         raise HTTPException(status_code=404, detail="Blog post not found")
 
     return _post_to_response(post)
+

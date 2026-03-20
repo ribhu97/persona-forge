@@ -163,11 +163,14 @@ class BlogPost(SQLModel, table=True):
     description: str
     author: str
     read_time: str
-    tags: str  # Comma-separated tags
+    tags: str  # Stored as JSON string
     content: str  # HTML content
     meta_title: str
     meta_description: str
     is_published: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
+    )
 

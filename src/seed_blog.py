@@ -2,27 +2,15 @@
 Seed script to populate the blog_posts table with initial articles.
 
 Run from the project root:
-    uv run src/seed_blog.py
+    python -m src.seed_blog
 """
-import os
-import sys
-from pathlib import Path
-
-# Ensure we can import from `src/` regardless of cwd
-SCRIPT_DIR = Path(__file__).resolve().parent  # .../persona-forge/src
-PROJECT_ROOT = SCRIPT_DIR.parent               # .../persona-forge
-
-# Add src/ to Python path so `from database import ...` works
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-# Force the database to live at the project root (not cwd)
-os.chdir(PROJECT_ROOT)
-
+import json
 from datetime import datetime, timezone
 from sqlmodel import Session, select
-from database import engine, create_db_and_tables
-from models import BlogPost
+from src.database import engine, create_db_and_tables
+from src.models import BlogPost
+
+
 SEED_POSTS = [
     {
         "slug": "what-are-user-personas-and-why-do-they-matter",
@@ -30,7 +18,7 @@ SEED_POSTS = [
         "description": "A comprehensive guide to understanding user personas, their importance in product development, and how they bridge the gap between assumptions and reality.",
         "author": "Pehloo Research",
         "read_time": "6 min read",
-        "tags": "UX Research,Product Strategy,Beginner",
+        "tags": json.dumps(["UX Research", "Product Strategy", "Beginner"]),
         "meta_title": "What Are User Personas? Guide to UX Personas | Pehloo",
         "meta_description": "Learn what user personas are, why they matter for product development, and how to use them to build better software.",
         "created_at": datetime(2026, 3, 1, tzinfo=timezone.utc),
@@ -68,7 +56,7 @@ SEED_POSTS = [
         "description": "Move beyond guesswork. Learn the step-by-step process of creating accurate user personas using quantitative data and qualitative insights.",
         "author": "Pehloo Research",
         "read_time": "8 min read",
-        "tags": "UX Research,Data Analysis,Guide",
+        "tags": json.dumps(["UX Research", "Data Analysis", "Guide"]),
         "meta_title": "How to Create Data-Driven User Personas in 5 Steps | Pehloo",
         "meta_description": "Master the art of creating accurate, data-driven user personas with our comprehensive step-by-step guide for product teams.",
         "created_at": datetime(2026, 3, 5, tzinfo=timezone.utc),
@@ -115,7 +103,7 @@ SEED_POSTS = [
         "description": "How artificial intelligence is transforming UX research, making persona generation faster, more accurate, and more accessible to all teams.",
         "author": "Pehloo Engineering",
         "read_time": "5 min read",
-        "tags": "AI,Future of Work,Product Strategy",
+        "tags": json.dumps(["AI", "Future of Work", "Product Strategy"]),
         "meta_title": "AI Persona Generation: The Future of UX Research | Pehloo",
         "meta_description": "Discover how AI is revolutionizing UX research by automating user persona generation and making data-driven insights accessible in minutes.",
         "created_at": datetime(2026, 3, 8, tzinfo=timezone.utc),
@@ -147,7 +135,7 @@ SEED_POSTS = [
         "description": "Avoid these critical errors that turn useful user personas into ignored PDF documents gathering dust on a shared drive.",
         "author": "Pehloo Research",
         "read_time": "7 min read",
-        "tags": "UX Research,Common Mistakes,Beginner",
+        "tags": json.dumps(["UX Research", "Common Mistakes", "Beginner"]),
         "meta_title": "5 Common Mistakes When Creating User Personas | Pehloo",
         "meta_description": "Avoid the 5 biggest mistakes product teams make when creating user personas. Learn how to build actionable, useful user profiles.",
         "created_at": datetime(2026, 3, 10, tzinfo=timezone.utc),
@@ -177,7 +165,7 @@ SEED_POSTS = [
         "description": "A breakdown of the critical differences between the people who use your product and the people who pay for it.",
         "author": "Pehloo Product",
         "read_time": "5 min read",
-        "tags": "Product Strategy,B2B,Marketing",
+        "tags": json.dumps(["Product Strategy", "B2B", "Marketing"]),
         "meta_title": "User Personas vs Buyer Personas: Understanding the Difference | Pehloo",
         "meta_description": "Confused about user personas vs buyer personas? Learn the key differences and why B2B SaaS teams need both to succeed.",
         "created_at": datetime(2026, 3, 12, tzinfo=timezone.utc),

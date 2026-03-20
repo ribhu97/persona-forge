@@ -180,6 +180,12 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                 </header>
 
                 {/* Article Content */}
+                {/* 
+                  * Note: dangerouslySetInnerHTML is used here to render the HTML structure of the blog post.
+                  * XSS Risk: High if content is user-generated.
+                  * Trust Assumption: Blog content is exclusively sourced from trusted admins/internal DB seeds, 
+                  * so it is considered safe. If user-generated content is ever allowed, this MUST be sanitized.
+                  */}
                 <div
                     className="prose prose-lg max-w-none
                         prose-headings:font-display prose-headings:font-normal prose-headings:mt-14 prose-headings:mb-8 prose-headings:text-foreground
