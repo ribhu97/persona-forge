@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.backend
     restart: always
     volumes:
-      - sqlite_data:/app/data
+      - ./data:/app/data
     env_file:
       - .env
     environment:
@@ -62,14 +62,14 @@ services:
     ports:
       - "8080:8001"
     volumes:
-      - sqlite_data:/data
+      - ./data:/data
     command: ["datasette", "/data/database.db", "--root", "--host", "0.0.0.0", "--port", "8001"]
     networks:
       - app-network
     restart: unless-stopped
 
-volumes:
-  sqlite_data:
+# volumes:
+#   sqlite_data:
 
 networks:
   app-network:

@@ -125,7 +125,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                         </Dialog.Description>
                     </div>
 
-                    {isLoading ? (
+                    {isLoading || (!exportStatus && !error) ? (
                         <div className="flex items-center justify-center py-8">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
