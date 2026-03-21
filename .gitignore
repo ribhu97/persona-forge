@@ -21,6 +21,7 @@ env/
 plans/
 reports/
 pehloo-brand-foundation.html
+GEO-AUDIT-REPORT.md
 
 # Packaging / distribution
 build/
@@ -70,6 +71,7 @@ profile_default/
 *.log
 
 # Database
+data/*
 database.db
 
 # uv related

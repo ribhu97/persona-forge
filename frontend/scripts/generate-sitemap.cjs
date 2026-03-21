@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const BASE_URL = 'https://personaforge.pehloo.com'; // Change this to your actual production domain
+const BASE_URL = 'https://personaforge.pehloo.xyz';
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
 const OUTPUT_PATH = path.resolve(__dirname, '../public/sitemap.xml');
 
@@ -52,23 +52,35 @@ async function generateSitemap() {
         <priority>1.0</priority>
     </url>
     <url>
-        <loc>${BASE_URL}/?page=pricing</loc>
+        <loc>${BASE_URL}/pricing</loc>
         <lastmod>${date}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>${BASE_URL}/?page=blog</loc>
+        <loc>${BASE_URL}/blog</loc>
         <lastmod>${date}</lastmod>
         <changefreq>daily</changefreq>
         <priority>0.9</priority>
     </url>
+    <url>
+        <loc>${BASE_URL}/privacy</loc>
+        <lastmod>${date}</lastmod>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>${BASE_URL}/terms</loc>
+        <lastmod>${date}</lastmod>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
 `;
 
-    // Dynamic Blog Pages
+    // Dynamic Blog Pages — use path-based URLs
     slugs.forEach(slug => {
         sitemap += `    <url>
-        <loc>${BASE_URL}/?page=blog&amp;slug=${slug}</loc>
+        <loc>${BASE_URL}/blog/${slug}</loc>
         <lastmod>${date}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
@@ -79,7 +91,7 @@ async function generateSitemap() {
 
     fs.writeFileSync(OUTPUT_PATH, sitemap);
     console.log(`Successfully generated sitemap.xml at ${OUTPUT_PATH}`);
-    console.log(`Total URLs: ${3 + slugs.length}`);
+    console.log(`Total URLs: ${5 + slugs.length}`);
 }
 
 generateSitemap();

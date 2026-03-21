@@ -12,6 +12,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PricingPage } from '@/components/pricing/PricingPage';
 import { BlogListPage } from '@/components/blog/BlogListPage';
 import { BlogPostPage } from '@/components/blog/BlogPostPage';
+import { PrivacyPolicyPage } from '@/components/legal/PrivacyPolicyPage';
+import { TermsOfServicePage } from '@/components/legal/TermsOfServicePage';
 import { Button } from '@/components/ui/button';
 import { personaAPI } from '@/lib/api';
 
@@ -43,6 +45,8 @@ function App() {
   const [showPricing, setShowPricing] = useState(false);
   const [showBlog, setShowBlog] = useState(false);
   const [selectedBlogSlug, setSelectedBlogSlug] = useState<string | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
@@ -153,6 +157,8 @@ function App() {
       if (page === 'blog') {
         setShowBlog(true);
         setShowPricing(false);
+        setShowPrivacy(false);
+        setShowTerms(false);
         if (slug) {
           setSelectedBlogSlug(slug);
         } else {
@@ -161,9 +167,23 @@ function App() {
       } else if (page === 'pricing') {
         setShowPricing(true);
         setShowBlog(false);
+        setShowPrivacy(false);
+        setShowTerms(false);
+      } else if (page === 'privacy') {
+        setShowPrivacy(true);
+        setShowBlog(false);
+        setShowPricing(false);
+        setShowTerms(false);
+      } else if (page === 'terms') {
+        setShowTerms(true);
+        setShowBlog(false);
+        setShowPricing(false);
+        setShowPrivacy(false);
       } else {
         setShowBlog(false);
         setShowPricing(false);
+        setShowPrivacy(false);
+        setShowTerms(false);
       }
     };
 
@@ -197,6 +217,18 @@ function App() {
         if (params.has('slug')) params.delete('slug');
         changed = true;
       }
+    } else if (showPrivacy) {
+      if (params.get('page') !== 'privacy') {
+        params.set('page', 'privacy');
+        if (params.has('slug')) params.delete('slug');
+        changed = true;
+      }
+    } else if (showTerms) {
+      if (params.get('page') !== 'terms') {
+        params.set('page', 'terms');
+        if (params.has('slug')) params.delete('slug');
+        changed = true;
+      }
     } else if (params.has('page')) {
       params.delete('page');
       params.delete('slug');
@@ -207,7 +239,7 @@ function App() {
       const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
       window.history.pushState({}, '', newUrl);
     }
-  }, [showBlog, selectedBlogSlug, showPricing]);
+  }, [showBlog, selectedBlogSlug, showPricing, showPrivacy, showTerms]);
 
   // Check auth on mount
   useEffect(() => {
@@ -336,6 +368,19 @@ function App() {
           <p className="text-red-700 text-sm">{chatError}</p>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="absolute bottom-0 left-0 right-0 py-4 px-6 text-center text-xs text-muted-foreground border-t border-border/50">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
+          <span>© {new Date().getFullYear()} Pehloo</span>
+          <span className="text-border">·</span>
+          <button onClick={() => setShowPrivacy(true)} className="hover:text-foreground transition-colors">Privacy Policy</button>
+          <span className="text-border">·</span>
+          <button onClick={() => setShowTerms(true)} className="hover:text-foreground transition-colors">Terms of Service</button>
+          <span className="text-border">·</span>
+          <a href="mailto:ribhu.lahiri@gmail.com" className="hover:text-foreground transition-colors">Contact</a>
+        </div>
+      </footer>
     </div>
   ) : (
     <div className="h-full overflow-hidden bg-background">
@@ -403,6 +448,24 @@ function App() {
           isAuthenticated={isAuthenticated}
           onLogin={() => setIsAuthDialogOpen(true)}
         />
+      </div>
+    );
+  }
+
+  // If showing privacy policy
+  if (showPrivacy) {
+    return (
+      <div className="h-screen w-screen overflow-auto bg-background">
+        <PrivacyPolicyPage onClose={() => setShowPrivacy(false)} />
+      </div>
+    );
+  }
+
+  // If showing terms of service
+  if (showTerms) {
+    return (
+      <div className="h-screen w-screen overflow-auto bg-background">
+        <TermsOfServicePage onClose={() => setShowTerms(false)} />
       </div>
     );
   }
