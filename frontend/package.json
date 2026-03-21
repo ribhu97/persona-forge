@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "sitemap": "node scripts/generate-sitemap.cjs",
-    "build": "npm run sitemap && tsc -b && vite build",
+    "robots": "node scripts/generate-robots.cjs",
+    "prebuild": "npm run sitemap && npm run robots",
+    "build": "npm run prebuild && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
