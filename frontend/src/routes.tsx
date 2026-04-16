@@ -10,12 +10,18 @@ import { PricingPage } from './components/pricing/PricingPage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
 
+// Resolves .generated/blog-posts.json relative to this file, regardless of cwd
+async function getBlogDataPath() {
+  const { fileURLToPath } = await import('node:url')
+  const { resolve, dirname } = await import('node:path')
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../.generated/blog-posts.json')
+}
+
 // Blog loaders — use fs at build/SSR time, fetch API at client runtime
 async function blogListLoader() {
   if (import.meta.ssr) {
     const { readFileSync } = await import('node:fs')
-    const { resolve } = await import('node:path')
-    const dataPath = resolve(process.cwd(), '.generated/blog-posts.json')
+    const dataPath = await getBlogDataPath()
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
     // Return summaries (no content field) for the list page
     return posts.map(({ content: _content, ...summary }: any) => summary)
@@ -31,8 +37,7 @@ async function blogPostLoader({ params }: LoaderFunctionArgs) {
   const { slug } = params
   if (import.meta.ssr) {
     const { readFileSync } = await import('node:fs')
-    const { resolve } = await import('node:path')
-    const dataPath = resolve(process.cwd(), '.generated/blog-posts.json')
+    const dataPath = await getBlogDataPath()
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
     return posts.find((p: any) => p.slug === slug) ?? null
   }
@@ -45,8 +50,9 @@ async function blogPostLoader({ params }: LoaderFunctionArgs) {
 function getBlogSlugs(): string[] {
   try {
     const { readFileSync } = require('fs')
-    const { resolve } = require('path')
-    const dataPath = resolve(process.cwd(), '.generated/blog-posts.json')
+    const { resolve, dirname } = require('path')
+    const { fileURLToPath } = require('url')
+    const dataPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.generated/blog-posts.json')
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
     return posts.map((p: any) => `/blog/${p.slug}`)
   } catch {

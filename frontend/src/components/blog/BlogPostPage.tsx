@@ -65,7 +65,8 @@ export function BlogPostPage({ className }: BlogPostPageProps) {
         );
     }
 
-    const canonicalUrl = `https://personaforge.pehloo.xyz/blog/${slug}`;
+    const siteUrl = import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz';
+    const canonicalUrl = `${siteUrl}/blog/${slug}`;
 
     return (
         <div className={cn(

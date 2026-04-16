@@ -63,10 +63,10 @@ export function BlogListPage({ className }: BlogListPageProps) {
             <Helmet>
                 <title>Blog — Product Intelligence | Persona Forge by Pehloo</title>
                 <meta name="description" content="Guides, insights, and research on shipping better products through rapid validation and data-driven user personas." />
-                <link rel="canonical" href="https://personaforge.pehloo.xyz/blog" />
+                <link rel="canonical" href={`${import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz'}/blog`} />
                 <meta property="og:title" content="Blog — Persona Forge by Pehloo" />
                 <meta property="og:description" content="Guides, insights, and research on shipping better products through rapid validation and data-driven user personas." />
-                <meta property="og:url" content="https://personaforge.pehloo.xyz/blog" />
+                <meta property="og:url" content={`${import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz'}/blog`} />
                 <meta property="og:type" content="website" />
                 <meta name="twitter:card" content="summary" />
                 <meta name="twitter:title" content="Blog — Persona Forge by Pehloo" />
