@@ -1,25 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { blogAPI } from '@/lib/api';
 import type { BlogPostSummary } from '@/lib/api';
+import { blogAPI } from '@/lib/api';
+import { useNavigate, useLoaderData } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 interface BlogListPageProps {
-    onClose?: () => void;
-    onSelectPost: (slug: string) => void;
     className?: string;
 }
 
-export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageProps) {
-    const [posts, setPosts] = useState<BlogPostSummary[]>([]);
-    const [loading, setLoading] = useState(true);
+export function BlogListPage({ className }: BlogListPageProps) {
+    const navigate = useNavigate();
+    const loaderPosts = useLoaderData() as BlogPostSummary[] | undefined;
+
+    const [posts, setPosts] = useState<BlogPostSummary[]>(loaderPosts ?? []);
+    const [loading, setLoading] = useState(!loaderPosts || loaderPosts.length === 0);
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const [retryCount, setRetryCount] = useState(0);
+    const [, setRetryCount] = useState(0);
 
-    useEffect(() => {
+    // Only fetch client-side if loader didn't populate (shouldn't happen in SSG, but guards hydration)
+    useState(() => {
+        if (loaderPosts && loaderPosts.length > 0) return;
         setLoading(true);
         setError(null);
         blogAPI.list(page, 10)
@@ -32,13 +37,42 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                 setError('Failed to load blog posts. Please try again.');
             })
             .finally(() => setLoading(false));
-    }, [page, retryCount]);
+    });
+
+    const loadPage = (newPage: number) => {
+        setPage(newPage);
+        setLoading(true);
+        setError(null);
+        blogAPI.list(newPage, 10)
+            .then((res) => {
+                setPosts(res.posts);
+                setTotalPages(res.total_pages);
+            })
+            .catch((err) => {
+                console.error('Failed to fetch blog posts:', err);
+                setError('Failed to load blog posts. Please try again.');
+            })
+            .finally(() => setLoading(false));
+    };
 
     return (
         <div className={cn(
             "min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 relative",
             className
         )}>
+            <Helmet>
+                <title>Blog — Product Intelligence | Persona Forge by Pehloo</title>
+                <meta name="description" content="Guides, insights, and research on shipping better products through rapid validation and data-driven user personas." />
+                <link rel="canonical" href="https://personaforge.pehloo.xyz/blog" />
+                <meta property="og:title" content="Blog — Persona Forge by Pehloo" />
+                <meta property="og:description" content="Guides, insights, and research on shipping better products through rapid validation and data-driven user personas." />
+                <meta property="og:url" content="https://personaforge.pehloo.xyz/blog" />
+                <meta property="og:type" content="website" />
+                <meta name="twitter:card" content="summary" />
+                <meta name="twitter:title" content="Blog — Persona Forge by Pehloo" />
+                <meta name="twitter:description" content="Guides, insights, and research on shipping better products through rapid validation and data-driven user personas." />
+            </Helmet>
+
             {/* JSON-LD Structured Data for Blog Page */}
             <script
                 type="application/ld+json"
@@ -48,7 +82,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                         "@type": "Blog",
                         "name": "Pehloo Persona Forge Blog",
                         "description": "Insights, guides, and research on user personas, AI product development, and UX research.",
-                        "url": window.location.href,
+                        "url": "https://personaforge.pehloo.xyz/blog",
                         "blogPost": posts.map(post => ({
                             "@type": "BlogPosting",
                             "headline": post.title,
@@ -63,17 +97,15 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
             />
 
             {/* Close Button */}
-            {onClose && (
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-all duration-200 z-50 rounded-none hover:bg-muted"
-                    aria-label="Close blog page"
-                >
-                    <X className="h-6 w-6" />
-                </Button>
-            )}
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-all duration-200 z-50 rounded-none hover:bg-muted"
+                aria-label="Close blog page"
+            >
+                <X className="h-6 w-6" />
+            </Button>
 
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
@@ -110,7 +142,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setRetryCount(c => c + 1)}
+                            onClick={() => { setRetryCount(c => c + 1); loadPage(page); }}
                             className="mt-4 font-mono text-[11px] uppercase tracking-widest rounded-none"
                         >
                             ▸ RETRY
@@ -126,7 +158,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                                 <article
                                     key={post.slug}
                                     className="bg-card border border-border p-8 relative hover:border-foreground transition-colors duration-300 cursor-pointer group"
-                                    onClick={() => onSelectPost(post.slug)}
+                                    onClick={() => navigate(`/blog/${post.slug}`)}
                                 >
                                     {/* Card Accent */}
                                     <div className="absolute top-[-1px] left-[-1px] w-6 h-6 border-t-2 border-l-2 border-foreground"></div>
@@ -170,7 +202,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    onClick={() => loadPage(Math.max(1, page - 1))}
                                     disabled={page <= 1}
                                     className="font-mono text-[11px] uppercase tracking-widest rounded-none disabled:opacity-30"
                                 >
@@ -182,7 +214,7 @@ export function BlogListPage({ onClose, onSelectPost, className }: BlogListPageP
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    onClick={() => loadPage(Math.min(totalPages, page + 1))}
                                     disabled={page >= totalPages}
                                     className="font-mono text-[11px] uppercase tracking-widest rounded-none disabled:opacity-30"
                                 >

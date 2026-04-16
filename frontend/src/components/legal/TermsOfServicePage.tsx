@@ -1,15 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
-interface TermsOfServicePageProps {
-  onClose: () => void;
-}
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 /**
  * Boilerplate Terms of Service page.
  * Replace the content in the `termsContent` variable below with your actual ToS markdown/text.
  */
-export function TermsOfServicePage({ onClose }: TermsOfServicePageProps) {
+export function TermsOfServicePage() {
+  const navigate = useNavigate();
   // ============================================================
   // REPLACE THIS CONTENT with your actual Terms of Service text.
   // You can paste in plain text or HTML — it will render as-is.
@@ -74,13 +73,19 @@ export function TermsOfServicePage({ onClose }: TermsOfServicePageProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Terms of Service — Persona Forge by Pehloo</title>
+        <meta name="description" content="Read the terms and conditions governing use of Persona Forge, the AI-powered user persona generation tool." />
+        <link rel="canonical" href="https://personaforge.pehloo.xyz/terms" />
+        <meta name="robots" content="noindex" />
+      </Helmet>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
-            onClick={onClose}
+            onClick={() => navigate(-1)}
             className="text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />

@@ -87,6 +87,14 @@ def list_blog_posts(
     )
 
 
+@router.get("/all", response_model=list[BlogPostResponse])
+def get_all_blog_posts(session: Session = Depends(get_session)):
+    """Return all published posts with full content. For build-time SSG use only."""
+    stmt = select(BlogPost).where(BlogPost.is_published).order_by(BlogPost.created_at.desc())
+    posts = session.exec(stmt).all()
+    return [_post_to_response(p) for p in posts]
+
+
 @router.get("/{slug}", response_model=BlogPostResponse)
 def get_blog_post(slug: str, session: Session = Depends(get_session)):
     """Get a single published blog post by slug (public, no auth required)."""

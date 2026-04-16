@@ -13,7 +13,7 @@ import type {
 } from '@/types';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
   timeout: 300000, // 5 minutes for long-running generations
   headers: {
     'Content-Type': 'application/json',
@@ -22,7 +22,7 @@ export const apiClient = axios.create({
 
 // Request interceptor for loading states and auth token
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
     console.error('API Error:', error);
 
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      if (typeof window !== 'undefined') localStorage.removeItem('token');
       // Optionally redirect to login or clear auth state via store (handled in store)
     }
 
