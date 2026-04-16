@@ -1,21 +1,20 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { ViteReactSSG } from 'vite-react-ssg'
+import { routes } from './routes'
 import './index.css'
-import App from './App.tsx'
-
-import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 if (!googleClientId) {
-  console.error('Google Client ID is missing. Please check your .env file.');
-  throw new Error('VITE_GOOGLE_CLIENT_ID environment variable is required');
+  console.warn('VITE_GOOGLE_CLIENT_ID missing — OAuth login will not work');
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <App />
-    </GoogleOAuthProvider>
-  </StrictMode>,
+// Export for vite-react-ssg (replaces ReactDOM.createRoot)
+export const createRoot = ViteReactSSG(
+  { routes },
+  // Setup fn: runs on both client and server
+  ({ isClient }) => {
+    if (isClient && googleClientId) {
+      // GoogleOAuthProvider is mounted inside AppLayout conditionally
+    }
+  },
 )

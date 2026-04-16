@@ -6,6 +6,7 @@ import { exportAPI } from '@/lib/api';
 import type { ExportStatus, ExportFormat, Persona } from '@/types';
 import { AccountType } from '@/types';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface ExportDialogProps {
     open: boolean;
@@ -14,6 +15,7 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps) {
+    const navigate = useNavigate();
     const [exportStatus, setExportStatus] = useState<ExportStatus | null>(null);
     const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
     const [isLoading, setIsLoading] = useState(false);
@@ -152,7 +154,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                             )}
                                             <div className="pt-2">
                                                 <button
-                                                    onClick={() => window.dispatchEvent(new CustomEvent('openPricing'))}
+                                                    onClick={() => navigate('/pricing')}
                                                     className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
                                                 >
                                                     Upgrade to unlock unlimited exports →

@@ -1,23 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { X, ArrowLeft } from 'lucide-react';
 import { blogAPI } from '@/lib/api';
 import type { BlogPostFull } from '@/lib/api';
+import { useNavigate, useParams, useLoaderData } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 interface BlogPostPageProps {
-    slug: string;
-    onBackToList: () => void;
-    onClose?: () => void;
     className?: string;
 }
 
-export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPostPageProps) {
-    const [post, setPost] = useState<BlogPostFull | null>(null);
-    const [loading, setLoading] = useState(true);
+export function BlogPostPage({ className }: BlogPostPageProps) {
+    const { slug = '' } = useParams<{ slug: string }>();
+    const navigate = useNavigate();
+    const loaderPost = useLoaderData() as BlogPostFull | null | undefined;
+
+    const [post, setPost] = useState<BlogPostFull | null>(loaderPost ?? null);
+    const [loading, setLoading] = useState(!loaderPost);
     const [error, setError] = useState<string | null>(null);
 
+    // Fetch client-side only if loader didn't supply the post (e.g., client-side nav)
     useEffect(() => {
+        if (loaderPost) return;
         setLoading(true);
         setError(null);
         blogAPI.getBySlug(slug)
@@ -27,39 +32,7 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                 setError('Blog post not found.');
             })
             .finally(() => setLoading(false));
-    }, [slug]);
-
-    // Update document metadata when post loads
-    useEffect(() => {
-        if (!post) return;
-
-        const originalTitle = document.title;
-        document.title = post.meta_title;
-
-        let metaDesc = document.querySelector('meta[name="description"]');
-        let originalDesc = "";
-
-        if (metaDesc) {
-            originalDesc = metaDesc.getAttribute('content') || "";
-            metaDesc.setAttribute('content', post.meta_description);
-        } else {
-            metaDesc = document.createElement('meta');
-            metaDesc.setAttribute('name', 'description');
-            metaDesc.setAttribute('content', post.meta_description);
-            document.head.appendChild(metaDesc);
-        }
-
-        return () => {
-            document.title = originalTitle;
-            if (metaDesc) {
-                if (originalDesc) {
-                    metaDesc.setAttribute('content', originalDesc);
-                } else {
-                    document.head.removeChild(metaDesc);
-                }
-            }
-        };
-    }, [post]);
+    }, [slug, loaderPost]);
 
     // Loading state
     if (loading) {
@@ -82,7 +55,7 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={onBackToList}
+                        onClick={() => navigate('/blog')}
                         className="font-mono text-[11px] uppercase tracking-widest rounded-none"
                     >
                         ▸ BACK_TO_BLOG
@@ -92,11 +65,27 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
         );
     }
 
+    const siteUrl = import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz';
+    const canonicalUrl = `${siteUrl}/blog/${slug}`;
+
     return (
         <div className={cn(
             "min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 relative overflow-x-hidden",
             className
         )}>
+            <Helmet>
+                <title>{post.meta_title}</title>
+                <meta name="description" content={post.meta_description} />
+                <link rel="canonical" href={canonicalUrl} />
+                <meta property="og:title" content={post.meta_title} />
+                <meta property="og:description" content={post.meta_description} />
+                <meta property="og:url" content={canonicalUrl} />
+                <meta property="og:type" content="article" />
+                <meta name="twitter:card" content="summary" />
+                <meta name="twitter:title" content={post.meta_title} />
+                <meta name="twitter:description" content={post.meta_description} />
+            </Helmet>
+
             {/* JSON-LD Structured Data for Individual Post */}
             <script
                 type="application/ld+json"
@@ -106,7 +95,7 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                         "@type": "BlogPosting",
                         "mainEntityOfPage": {
                             "@type": "WebPage",
-                            "@id": window.location.href
+                            "@id": canonicalUrl
                         },
                         "headline": post.meta_title,
                         "description": post.meta_description,
@@ -133,7 +122,7 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={onBackToList}
+                    onClick={() => navigate('/blog')}
                     className="pointer-events-auto text-muted-foreground hover:text-foreground font-mono text-[11px] uppercase tracking-widest rounded-none"
                     style={{ background: 'var(--background)' }}
                 >
@@ -141,18 +130,16 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                     ▸ BACK_TO_BLOG
                 </Button>
 
-                {onClose && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onClose}
-                        className="pointer-events-auto text-muted-foreground hover:text-foreground hover:bg-muted rounded-none"
-                        style={{ background: 'var(--background)' }}
-                        aria-label="Close blog"
-                    >
-                        <X className="h-6 w-6" />
-                    </Button>
-                )}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate('/')}
+                    className="pointer-events-auto text-muted-foreground hover:text-foreground hover:bg-muted rounded-none"
+                    style={{ background: 'var(--background)' }}
+                    aria-label="Close blog"
+                >
+                    <X className="h-6 w-6" />
+                </Button>
             </div>
 
             <article className="max-w-3xl mx-auto mt-8">
@@ -180,10 +167,10 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                 </header>
 
                 {/* Article Content */}
-                {/* 
+                {/*
                   * Note: dangerouslySetInnerHTML is used here to render the HTML structure of the blog post.
                   * XSS Risk: High if content is user-generated.
-                  * Trust Assumption: Blog content is exclusively sourced from trusted admins/internal DB seeds, 
+                  * Trust Assumption: Blog content is exclusively sourced from trusted admins/internal DB seeds,
                   * so it is considered safe. If user-generated content is ever allowed, this MUST be sanitized.
                   */}
                 <div
@@ -206,7 +193,7 @@ export function BlogPostPage({ slug, onBackToList, onClose, className }: BlogPos
                         Don't let bad assumptions ruin good products. Generate perfectly calibrated, data-driven user personas in 10 minutes.
                     </p>
                     <Button
-                        onClick={onClose}
+                        onClick={() => navigate('/')}
                         className="rounded-none bg-[#27ae60] hover:bg-[#27ae60]/90 text-white font-mono text-[11px] tracking-widest uppercase font-bold"
                     >
                         ▸ TRY_PERSONA_FORGE

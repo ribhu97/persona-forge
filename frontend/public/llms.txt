@@ -1,0 +1,30 @@
+# Persona Forge by Pehloo
+
+> AI-powered user persona generator — describe your product, get structured, interview-ready personas in minutes.
+
+Persona Forge uses Google Gemini AI to generate detailed user personas from product descriptions and file uploads. Designed for product managers, founders, and UX researchers who need fast, actionable personas grounded in real research frameworks.
+
+## Pages
+
+- [Home](https://personaforge.pehloo.xyz/): Generate user personas — enter your product description and get structured personas instantly
+- [Blog](https://personaforge.pehloo.xyz/blog): Product intelligence — guides, insights, and research on user personas, AI product development, and UX research
+- [Pricing](https://personaforge.pehloo.xyz/pricing): Plans and pricing for Persona Forge
+
+## Key Features
+
+- Generate 3–5 structured user personas from a product description in under 60 seconds
+- Upload PDFs, images, and markdown to enrich persona generation
+- Export personas as PDF for stakeholder presentations
+- Three generation modes: Quick, Think Hard, Do My Homework
+- Persona fields: demographics, goals, frustrations, behavioral patterns, tech comfort, recruitment criteria
+
+## About
+
+Persona Forge is a product by Pehloo. It is designed to replace hours of manual persona research with AI-assisted generation that follows established UX research frameworks.
+
+
+## Optional
+
+- [Privacy Policy](https://personaforge.pehloo.xyz/privacy)
+- [Terms of Service](https://personaforge.pehloo.xyz/terms)
+- [Sitemap](https://personaforge.pehloo.xyz/sitemap.xml)

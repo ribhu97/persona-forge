@@ -19,6 +19,7 @@ export function SplitLayout({
   className
 }: SplitLayoutProps) {
   const [ratio, setRatio] = useState(() => {
+    if (typeof localStorage === 'undefined') return defaultRatio;
     const saved = localStorage.getItem('split-layout-ratio');
     return saved ? parseFloat(saved) : defaultRatio;
   });
