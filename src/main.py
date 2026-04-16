@@ -49,12 +49,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
-app.include_router(chat_router)
-app.include_router(export_router)
-app.include_router(payments_router)
-app.include_router(personas_router)
-app.include_router(blog_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(export_router, prefix="/api")
+app.include_router(payments_router, prefix="/api")
+app.include_router(personas_router, prefix="/api")
+app.include_router(blog_router, prefix="/api")
 
 @app.get("/")
 async def root():

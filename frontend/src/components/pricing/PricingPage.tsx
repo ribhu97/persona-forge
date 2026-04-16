@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { cn } from '@/lib/utils';
 import { Check, Sparkles, Zap, Crown, X, Loader2 } from 'lucide-react';
 import { paymentAPI } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 
 // removed toast and sonner import to fix lint error and safe fallback to alert for now
@@ -92,13 +94,13 @@ const LIFETIME_OFFER = {
 };
 
 interface PricingPageProps {
-    onClose?: () => void;
     className?: string;
     isAuthenticated?: boolean;
     onLogin?: () => void;
 }
 
-export function PricingPage({ onClose, className, isAuthenticated, onLogin }: PricingPageProps) {
+export function PricingPage({ className, isAuthenticated, onLogin }: PricingPageProps) {
+    const navigate = useNavigate();
     const [currency, setCurrency] = useState<Currency>('INR');
     const [isLoading, setIsLoading] = useState<string | null>(null);
 
@@ -109,7 +111,7 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
         }
 
         if (tierName === 'Free') {
-            onClose?.();
+            navigate(-1);
             return;
         }
 
@@ -172,18 +174,25 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
             "min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8 relative",
             className
         )}>
+            <Helmet>
+                <title>Pricing — Persona Forge by Pehloo</title>
+                <meta name="description" content="Simple, transparent pricing for AI-powered user persona generation. Start free, upgrade when you're ready." />
+                <link rel="canonical" href="https://personaforge.pehloo.xyz/pricing" />
+                <meta property="og:title" content="Pricing — Persona Forge by Pehloo" />
+                <meta property="og:description" content="Simple, transparent pricing for AI-powered user persona generation." />
+                <meta property="og:url" content="https://personaforge.pehloo.xyz/pricing" />
+                <meta property="og:type" content="website" />
+            </Helmet>
             {/* Close Button */}
-            {onClose && (
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-all duration-200 z-50 rounded-full hover:bg-muted"
-                    aria-label="Close pricing page"
-                >
-                    <X className="h-6 w-6" />
-                </Button>
-            )}
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-all duration-200 z-50 rounded-full hover:bg-muted"
+                aria-label="Close pricing page"
+            >
+                <X className="h-6 w-6" />
+            </Button>
 
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
@@ -355,14 +364,12 @@ export function PricingPage({ onClose, className, isAuthenticated, onLogin }: Pr
             {/* Footer Note */}
             <p className="text-center text-sm text-muted-foreground mt-8">
                 All plans include basic support. Prices are in {currency === 'USD' ? 'US Dollars' : 'Indian Rupees'}.
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        className="ml-2 text-primary hover:underline font-medium"
-                    >
-                        Go back
-                    </button>
-                )}
+                <button
+                    onClick={() => navigate(-1)}
+                    className="ml-2 text-primary hover:underline font-medium"
+                >
+                    Go back
+                </button>
             </p>
         </div>
     );

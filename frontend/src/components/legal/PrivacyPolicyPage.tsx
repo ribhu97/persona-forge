@@ -1,15 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
-interface PrivacyPolicyPageProps {
-  onClose: () => void;
-}
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 /**
  * Boilerplate Privacy Policy page.
  * Replace the content in the `policyContent` variable below with your actual privacy policy markdown/text.
  */
-export function PrivacyPolicyPage({ onClose }: PrivacyPolicyPageProps) {
+export function PrivacyPolicyPage() {
+  const navigate = useNavigate();
   // ============================================================
   // REPLACE THIS CONTENT with your actual Privacy Policy text.
   // You can paste in plain text or HTML — it will render as-is.
@@ -68,13 +67,19 @@ export function PrivacyPolicyPage({ onClose }: PrivacyPolicyPageProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Privacy Policy — Persona Forge by Pehloo</title>
+        <meta name="description" content="Learn how Persona Forge collects, uses, and protects your personal information." />
+        <link rel="canonical" href="https://personaforge.pehloo.xyz/privacy" />
+        <meta name="robots" content="noindex" />
+      </Helmet>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
-            onClick={onClose}
+            onClick={() => navigate(-1)}
             className="text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
