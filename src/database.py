@@ -15,17 +15,19 @@ def create_db_and_tables():
     # Manual migration helper for existing databases
     # SQLModel create_all doesn't add new columns to existing tables
     import sqlite3
-    from urllib.parse import urlparse
     
     # Only run the manual SQLite migration if we're actually using SQLite
     if not sqlite_url.startswith("sqlite"):
         return
 
-    # Extract the file path from the sqlite:/// URL.
-    # sqlite:////data/database.db  → /data/database.db  (absolute, 4 slashes)
-    # sqlite:///database.db        → database.db         (relative, 3 slashes)
-    parsed = urlparse(sqlite_url)
-    db_path = parsed.path  # preserves leading slash for absolute paths
+    # Extract the file path from the sqlite:/// URL using the same logic SQLAlchemy uses.
+    # sqlite:////data/database.db → strip "sqlite:///" → "/data/database.db" (absolute)
+    # sqlite:///database.db       → strip "sqlite:///" → "database.db" (relative, resolve from CWD)
+    url_body = sqlite_url[len("sqlite:///"):]
+    if url_body.startswith("/"):
+        db_path = url_body  # absolute path
+    else:
+        db_path = os.path.abspath(url_body)  # resolve relative path
 
     try:
         conn = sqlite3.connect(db_path)

@@ -1,0 +1,33 @@
+# Secrets — never bake into the image
+.env
+.env.*
+
+# Local databases and persistent data
+data/
+database.db
+*.db
+
+# Dev tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Frontend deps (each service builds its own)
+frontend/node_modules/
+
+# SSL certs managed at runtime
+certbot/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Git
+.git/

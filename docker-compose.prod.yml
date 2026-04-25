@@ -5,11 +5,11 @@ services:
       dockerfile: Dockerfile.backend
     restart: always
     volumes:
-      - ./data:/app/data
+      - ./data:/data
     env_file:
       - .env
     environment:
-      - DATABASE_URL=sqlite:///data/database.db
+      - DATABASE_URL=sqlite:////data/database.db
       - ALLOWED_ORIGINS=https://personaforge.pehloo.xyz
     networks:
       - app-network
