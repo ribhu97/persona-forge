@@ -1,0 +1,2 @@
+FROM datasetteproject/datasette:latest
+RUN datasette install datasette-write-ui

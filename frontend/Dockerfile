@@ -16,6 +16,12 @@ COPY . .
 # We set VITE_API_URL to empty string so that requests are relative (e.g. /auth/login)
 # This allows Nginx to proxy them to the backend.
 ENV VITE_API_URL=""
+# Add these two lines:
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+ARG VITE_RAZORPAY_KEY_ID
+ENV VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID
+
 RUN npm run build
 
 # Stage 4: Production
