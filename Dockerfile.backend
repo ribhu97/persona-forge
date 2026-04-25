@@ -25,6 +25,13 @@ RUN uv sync --frozen
 # Copy the rest of the application
 COPY . .
 
+# Persistent storage for the SQLite database.
+# Mount a volume here at runtime so the database survives container restarts and redeploys.
+# Example: docker run -v persona-forge-db:/data ...
+# Or set DATABASE_URL to a Postgres instance to avoid this entirely.
+RUN mkdir -p /data
+VOLUME /data
+
 # Expose the port the app runs on
 EXPOSE 8000
 

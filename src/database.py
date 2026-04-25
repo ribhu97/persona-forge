@@ -3,7 +3,7 @@ from typing import Generator
 
 import os
 
-sqlite_file_name = "database.db"
+sqlite_file_name = os.getenv("SQLITE_PATH", "/data/database.db")
 sqlite_url = os.getenv("DATABASE_URL", f"sqlite:///{sqlite_file_name}")
 
 connect_args = {"check_same_thread": False}
@@ -17,11 +17,15 @@ def create_db_and_tables():
     import sqlite3
     from urllib.parse import urlparse
     
-    # Extract path from sqlite:///database.db
+    # Only run the manual SQLite migration if we're actually using SQLite
+    if not sqlite_url.startswith("sqlite"):
+        return
+
+    # Extract the file path from the sqlite:/// URL.
+    # sqlite:////data/database.db  → /data/database.db  (absolute, 4 slashes)
+    # sqlite:///database.db        → database.db         (relative, 3 slashes)
     parsed = urlparse(sqlite_url)
-    db_path = parsed.path.lstrip('/')
-    if not db_path: # Handle cases like sqlite:///database.db vs sqlite:///../database.db
-        db_path = sqlite_file_name
+    db_path = parsed.path  # preserves leading slash for absolute paths
 
     try:
         conn = sqlite3.connect(db_path)
