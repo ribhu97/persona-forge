@@ -30,6 +30,7 @@ class Payment(SQLModel, table=True):
     razorpay_payment_id: Optional[str] = None
     amount: float
     currency: str = "INR"
+    plan_type: Optional[str] = Field(default=None)  # plus, pro, lifetime — source of truth for upgrades
     status: str # created, paid, failed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     

@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -6,6 +7,25 @@ from sqlmodel import Session
 from src.database import get_session
 from src.models import User
 from src.auth import SECRET_KEY, ALGORITHM
+
+
+ACCOUNT_ADMIN = 99
+
+def effective_account_type(user: User) -> int:
+    """Return the user's account type, downgrading to Free (0) if subscription has expired.
+    Admin accounts (type=99) are never subject to expiry.
+    """
+    if user.account_type == 0:
+        return 0
+    if user.account_type == ACCOUNT_ADMIN:
+        return ACCOUNT_ADMIN
+    if user.subscription_expires_at is not None:
+        expiry = user.subscription_expires_at
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expiry:
+            return 0
+    return user.account_type
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 

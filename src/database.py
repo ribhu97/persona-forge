@@ -48,7 +48,15 @@ def create_db_and_tables():
             cursor.execute("ALTER TABLE users ADD COLUMN last_export_at DATETIME")
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_users_last_export_at ON users (last_export_at)")
             print("Successfully added last_export_at column and index to users table")
-            
+
+        # payments table migrations
+        cursor.execute("PRAGMA table_info(payments)")
+        payment_columns = [col[1] for col in cursor.fetchall()]
+
+        if payment_columns and 'plan_type' not in payment_columns:
+            cursor.execute("ALTER TABLE payments ADD COLUMN plan_type TEXT")
+            print("Successfully added plan_type column to payments table")
+
         conn.commit()
         conn.close()
     except Exception as e:

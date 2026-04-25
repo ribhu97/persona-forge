@@ -21,7 +21,9 @@ from src.database import get_session
 from src.models import User
 
 # Config
-SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is not set. Refusing to start.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
