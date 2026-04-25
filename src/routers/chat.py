@@ -132,7 +132,12 @@ async def list_conversations(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    return user.conversations
+    stmt = (
+        select(Conversation)
+        .where(Conversation.user_id == user.id)
+        .order_by(Conversation.last_message_at.desc())
+    )
+    return session.exec(stmt).all()
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
