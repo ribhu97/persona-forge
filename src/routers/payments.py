@@ -138,5 +138,7 @@ async def verify_payment(
         
     except razorpay.errors.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
+    except HTTPException:
+        raise  # preserve 4xx errors we raised intentionally
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

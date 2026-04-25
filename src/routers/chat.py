@@ -10,24 +10,12 @@ from src.models import (
     Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
 )
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
-from src.dependencies import get_current_user
+from src.dependencies import get_current_user, effective_account_type
 from src.generator import generate_personas, generate_chat_name
 from sqlalchemy import func
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
-
-def effective_account_type(user: User) -> int:
-    """Return the user's account type, downgrading to Free if subscription has expired."""
-    if user.account_type == 0:
-        return 0
-    if user.subscription_expires_at is not None:
-        expiry = user.subscription_expires_at
-        if expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expiry:
-            return 0  # Subscription lapsed — treat as Free
-    return user.account_type
 
 
 def check_conversation_limit(user: User, session: Session):
