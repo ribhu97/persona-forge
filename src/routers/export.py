@@ -16,7 +16,7 @@ from reportlab.lib.enums import TA_LEFT
 from src.database import get_session
 from src.models import User, Persona
 from src.schemas import ExportRequest, ExportStatusResponse
-from src.dependencies import get_current_user
+from src.dependencies import get_current_user, effective_account_type
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -37,9 +37,8 @@ def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
     Check if user can export.
     Returns: (can_export, exports_remaining, next_available_date)
     """
-    # Admins have unlimited exports
-    # Admins and Pro users have unlimited exports
-    if user.account_type >= ACCOUNT_PRO:
+    # Admins and Pro users have unlimited exports; respect subscription expiry
+    if effective_account_type(user) >= ACCOUNT_PRO:
         return True, -1, None  # -1 means unlimited
     
     # Free users: check last export date
@@ -51,9 +50,9 @@ def check_export_eligibility(user: User) -> tuple[bool, int, datetime | None]:
     if last_export.tzinfo is None:
         last_export = last_export.replace(tzinfo=timezone.utc)
         
-    # Calculate when next export is available
+    # Calculate when next export is available; use effective tier to respect expiry
     days_wait = EXPORT_LIMIT_FREE
-    if user.account_type == ACCOUNT_PLUS:
+    if effective_account_type(user) == ACCOUNT_PLUS:
         days_wait = EXPORT_LIMIT_PLUS
         
     next_available = last_export + timedelta(days=days_wait)
