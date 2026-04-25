@@ -9,10 +9,16 @@ from src.models import User
 from src.auth import SECRET_KEY, ALGORITHM
 
 
+ACCOUNT_ADMIN = 99
+
 def effective_account_type(user: User) -> int:
-    """Return the user's account type, downgrading to Free (0) if subscription has expired."""
+    """Return the user's account type, downgrading to Free (0) if subscription has expired.
+    Admin accounts (type=99) are never subject to expiry.
+    """
     if user.account_type == 0:
         return 0
+    if user.account_type == ACCOUNT_ADMIN:
+        return ACCOUNT_ADMIN
     if user.subscription_expires_at is not None:
         expiry = user.subscription_expires_at
         if expiry.tzinfo is None:
