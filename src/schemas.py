@@ -23,6 +23,19 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: Optional[str] = None
+    auth_provider: str
+    is_verified: bool
+    account_type: int
+    subscription_active: bool
+    subscription_expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
 # Chat Schemas
 class ConversationCreate(BaseModel):
     title: Optional[str] = None

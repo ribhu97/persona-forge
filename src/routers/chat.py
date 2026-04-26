@@ -284,7 +284,7 @@ async def send_message(
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
+        raise HTTPException(status_code=500, detail="An internal error occurred while saving personas.")
 
 
 @router.post("/generate-personas")
@@ -343,7 +343,7 @@ async def generate_personas_api(
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
+        raise HTTPException(status_code=500, detail="An internal error occurred while saving personas.")
 
 
 @router.post("/generate-chat-name")
@@ -361,7 +361,7 @@ async def generate_chat_name_api(
         return {"success": True, "data": {"chat_name": chat_name}}
     except Exception as e:
         print(f"Error generating chat name: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating chat name: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred while generating the chat name.")
 
 
 @router.delete("/{conversation_id}")

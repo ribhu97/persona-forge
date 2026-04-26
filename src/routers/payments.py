@@ -5,7 +5,7 @@ import razorpay
 import os
 import hmac
 import hashlib
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 from ..database import get_session
@@ -19,6 +19,12 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
+PLAN_PRICES: dict[str, float] = {
+    "plus": 799.0,
+    "pro": 1499.0,
+    "lifetime": 4999.0,
+}
+
 def get_razorpay_client():
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
         raise HTTPException(
@@ -28,9 +34,9 @@ def get_razorpay_client():
     return razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 class OrderCreate(BaseModel):
-    amount: float # In INR
+    model_config = ConfigDict(extra="ignore")
     currency: str = "INR"
-    plan_type: str # plus, pro, lifetime
+    plan_type: str  # plus, pro, lifetime
 
 class PaymentVerify(BaseModel):
     razorpay_order_id: str
@@ -43,10 +49,14 @@ async def create_order(
     current_user: User = Depends(get_current_user), # We need to import authentication dependency
     session: Session = Depends(get_session)
 ):
+    if order_data.plan_type not in PLAN_PRICES:
+        raise HTTPException(status_code=400, detail=f"Unknown plan type: {order_data.plan_type}")
+
     try:
+        amount = PLAN_PRICES[order_data.plan_type]
         # Amount in paise
-        amount_paise = int(order_data.amount * 100)
-        
+        amount_paise = int(amount * 100)
+
         data = {
             "amount": amount_paise,
             "currency": order_data.currency,
@@ -56,29 +66,32 @@ async def create_order(
                 "plan_type": order_data.plan_type
             }
         }
-        
+
         client = get_razorpay_client()
         order = client.order.create(data=data)
-        
+
         # Save pending payment to DB — plan_type is the authoritative record for upgrades
         payment = Payment(
             user_id=current_user.id,
             razorpay_order_id=order['id'],
-            amount=order_data.amount,
+            amount=amount,
             currency=order_data.currency,
             plan_type=order_data.plan_type,
             status="created"
         )
         session.add(payment)
         session.commit()
-        
+
         return {
             "order_id": order['id'],
             "amount": order['amount'],
             "currency": order['currency'],
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error creating payment order: {e}")
+        raise HTTPException(status_code=500, detail="Payment order creation failed. Please try again.")
 
 @router.post("/verify-payment")
 async def verify_payment(
@@ -141,4 +154,5 @@ async def verify_payment(
     except HTTPException:
         raise  # preserve 4xx errors we raised intentionally
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error verifying payment: {e}")
+        raise HTTPException(status_code=500, detail="Payment verification failed. Please try again.")
