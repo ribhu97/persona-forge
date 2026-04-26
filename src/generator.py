@@ -382,6 +382,12 @@ def generate_personas(text: str, generated_persona: Optional[str] = None) -> dic
         print(f"Gemini rate-limited (429 {e.status}). Falling back to Groq.")
 
     # --- Groq fallback ---
+    # If GROQ_API_KEY is not set, the client constructor raises before we ever reach
+    # the except block below. Check early so missing config surfaces as 503 capacity
+    # (not an unhandled 500).
+    if not os.environ.get("GROQ_API_KEY"):
+        raise AllProvidersRateLimitedError()
+
     # If Gemini is rate-limited and Groq is also unavailable (rate-limited or
     # misconfigured), the net result is no capacity — surface as 503.
     try:

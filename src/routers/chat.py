@@ -5,6 +5,7 @@ from typing import Annotated, List
 from datetime import datetime, timezone, timedelta
 
 from src.database import get_session
+from sqlalchemy.exc import OperationalError
 from src.models import (
     User, Conversation, Message, Persona, Demographics, Goal,
     Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
@@ -277,10 +278,13 @@ async def send_message(
         session.commit()
         session.refresh(asst_msg)
         return asst_msg
+    except OperationalError:
+        session.rollback()
+        raise  # propagates to @app.exception_handler(OperationalError) → 503
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving personas: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
 
 
 @router.post("/generate-personas")
@@ -333,10 +337,13 @@ async def generate_personas_api(
 
         session.commit()
         return {"success": True, "data": {"personas": persona_data["personas"]}}
+    except OperationalError:
+        session.rollback()
+        raise  # propagates to @app.exception_handler(OperationalError) → 503
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving personas: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
 
 
 @router.post("/generate-chat-name")
