@@ -5,6 +5,7 @@ from typing import Annotated, List
 from datetime import datetime, timezone, timedelta
 
 from src.database import get_session
+from sqlalchemy.exc import OperationalError
 from src.models import (
     User, Conversation, Message, Persona, Demographics, Goal,
     Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
@@ -12,6 +13,8 @@ from src.models import (
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
 from src.dependencies import get_current_user, effective_account_type
 from src.generator import generate_personas, generate_chat_name
+from src.exceptions import AllProvidersRateLimitedError
+from google.genai import errors as genai_errors
 from sqlalchemy import func
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
@@ -51,55 +54,53 @@ def _get_ordered_text(items, text_attr: str) -> list:
 
 def save_personas_to_db(session: Session, message_id: int, user_id: int, personas_data: list) -> None:
     """
-    Persist a list of persona dicts (as returned by generate_personas) to the DB.
-    All inserts are batched and committed in a single transaction; rolls back on any error.
+    Stage persona rows into the session without committing.
+
+    All adds and flushes are performed here so the caller can get persona IDs,
+    but the transaction boundary (commit + rollback) is owned entirely by the
+    caller. This prevents a double-commit bug where an inner commit would
+    durably write personas even if the outer transaction later failed.
     """
-    try:
-        for p_data in personas_data:
-            persona = Persona(
-                message_id=message_id,
-                user_id=user_id,
-                name=p_data["name"],
-                status=p_data["status"],
-                role=p_data["role"],
-                tech_comfort=p_data["tech_comfort"],
-                scenario_context=p_data.get("scenario_context", ""),
-            )
-            session.add(persona)
-            session.flush()  # get persona.id without committing
+    for p_data in personas_data:
+        persona = Persona(
+            message_id=message_id,
+            user_id=user_id,
+            name=p_data["name"],
+            status=p_data["status"],
+            role=p_data["role"],
+            tech_comfort=p_data["tech_comfort"],
+            scenario_context=p_data.get("scenario_context", ""),
+        )
+        session.add(persona)
+        session.flush()  # get persona.id without committing
 
-            if "demographics" in p_data and isinstance(p_data["demographics"], dict):
-                demo = p_data["demographics"]
-                session.add(Demographics(
-                    persona_id=persona.id,
-                    age=str(demo.get("age")),
-                    location=demo.get("location"),
-                    education=demo.get("education"),
-                    industry=demo.get("industry"),
-                ))
+        if "demographics" in p_data and isinstance(p_data["demographics"], dict):
+            demo = p_data["demographics"]
+            session.add(Demographics(
+                persona_id=persona.id,
+                age=str(demo.get("age")),
+                location=demo.get("location"),
+                education=demo.get("education"),
+                industry=demo.get("industry"),
+            ))
 
-            for i, text in enumerate(p_data.get("goals", [])):
-                session.add(Goal(persona_id=persona.id, goal_text=text, order_index=i))
+        for i, text in enumerate(p_data.get("goals", [])):
+            session.add(Goal(persona_id=persona.id, goal_text=text, order_index=i))
 
-            for i, text in enumerate(p_data.get("frustrations", [])):
-                session.add(Frustration(persona_id=persona.id, frustration_text=text, order_index=i))
+        for i, text in enumerate(p_data.get("frustrations", [])):
+            session.add(Frustration(persona_id=persona.id, frustration_text=text, order_index=i))
 
-            for i, text in enumerate(p_data.get("behavioral_patterns", [])):
-                session.add(BehavioralPattern(persona_id=persona.id, pattern_text=text, order_index=i))
+        for i, text in enumerate(p_data.get("behavioral_patterns", [])):
+            session.add(BehavioralPattern(persona_id=persona.id, pattern_text=text, order_index=i))
 
-            for i, text in enumerate(p_data.get("influence_networks", [])):
-                session.add(InfluenceNetwork(persona_id=persona.id, network_text=text, order_index=i))
+        for i, text in enumerate(p_data.get("influence_networks", [])):
+            session.add(InfluenceNetwork(persona_id=persona.id, network_text=text, order_index=i))
 
-            for i, text in enumerate(p_data.get("recruitment_criteria", [])):
-                session.add(RecruitmentCriteria(persona_id=persona.id, criteria_text=text, order_index=i))
+        for i, text in enumerate(p_data.get("recruitment_criteria", [])):
+            session.add(RecruitmentCriteria(persona_id=persona.id, criteria_text=text, order_index=i))
 
-            for i, text in enumerate(p_data.get("research_assumptions", [])):
-                session.add(ResearchAssumption(persona_id=persona.id, assumption_text=text, order_index=i))
-
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
+        for i, text in enumerate(p_data.get("research_assumptions", [])):
+            session.add(ResearchAssumption(persona_id=persona.id, assumption_text=text, order_index=i))
 
 
 @router.post("/", response_model=ConversationResponse)
@@ -233,10 +234,18 @@ async def send_message(
         if personas_list:
             generated_persona_str = json.dumps({"personas": personas_list})
 
-    # Call Gemini — do this BEFORE writing anything to the DB so a failed generation
-    # doesn't consume the user's message quota.
+    # Call generation API — do this BEFORE writing anything to the DB so a failed
+    # generation doesn't consume the user's message quota.
     try:
         persona_data = generate_personas(data.content, generated_persona=generated_persona_str)
+    except AllProvidersRateLimitedError:
+        raise HTTPException(
+            status_code=503,
+            detail="AT_CAPACITY: All AI providers are currently rate-limited. Please try again in a moment.",
+        )
+    except genai_errors.ClientError as e:
+        print(f"Gemini client error {e.code} ({e.status}): {e.message}")
+        raise HTTPException(status_code=500, detail="Persona generation failed. Please try again.")
     except Exception as e:
         print(f"Error calling generation API: {e}")
         raise HTTPException(status_code=500, detail="Persona generation failed. Please try again.")
@@ -269,10 +278,13 @@ async def send_message(
         session.commit()
         session.refresh(asst_msg)
         return asst_msg
+    except OperationalError:
+        session.rollback()
+        raise  # propagates to @app.exception_handler(OperationalError) → 503
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving personas: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
 
 
 @router.post("/generate-personas")
@@ -287,9 +299,17 @@ async def generate_personas_api(
 
     check_conversation_limit(user, session)
 
-    # Call Gemini before writing to DB — don't consume the thread slot on a failed generation
+    # Call generation API before writing to DB — don't consume the thread slot on failure
     try:
         persona_data = generate_personas(text)
+    except AllProvidersRateLimitedError:
+        raise HTTPException(
+            status_code=503,
+            detail="AT_CAPACITY: All AI providers are currently rate-limited. Please try again in a moment.",
+        )
+    except genai_errors.ClientError as e:
+        print(f"Gemini client error {e.code} ({e.status}): {e.message}")
+        raise HTTPException(status_code=500, detail="Persona generation failed. Please try again.")
     except Exception as e:
         print(f"Error calling generation API: {e}")
         raise HTTPException(status_code=500, detail="Persona generation failed. Please try again.")
@@ -317,10 +337,13 @@ async def generate_personas_api(
 
         session.commit()
         return {"success": True, "data": {"personas": persona_data["personas"]}}
+    except OperationalError:
+        session.rollback()
+        raise  # propagates to @app.exception_handler(OperationalError) → 503
     except Exception as e:
         session.rollback()
         print(f"Error persisting personas: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving personas: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error saving personas. Please try again.")
 
 
 @router.post("/generate-chat-name")

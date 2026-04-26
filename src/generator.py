@@ -5,7 +5,10 @@ from typing import Optional
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
+from openai import RateLimitError as OpenAIRateLimitError, AuthenticationError as OpenAIAuthError
 
+from src.exceptions import AllProvidersRateLimitedError
 from src.prompts import (
     chat_naming_prompt,
     refined_generation_prompt,
@@ -14,22 +17,70 @@ from src.prompts import (
 
 load_dotenv()
 
+GEMINI_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT_S", "30"))  # seconds
+GROQ_TIMEOUT = int(os.environ.get("GROQ_TIMEOUT_S", "30"))  # seconds
+
+
+def _extract_json_object(text: str) -> str:
+    """Strip code fences then find the first balanced JSON object.
+
+    Uses a character-by-character scan rather than a greedy regex so that
+    surrounding prose (before or after the JSON object) is discarded cleanly.
+    """
+    text = text.strip()
+    # Strip code fences
+    if text.startswith("```json"):
+        text = text[7:]
+    elif text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    start = text.find("{")
+    if start == -1:
+        return text  # no object found; parse_json will raise JSONDecodeError
+
+    depth = 0
+    in_string = False
+    escape_next = False
+    for i, ch in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif not in_string:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+    # Unbalanced brace — return from first { to end; parse_json will catch the error
+    return text[start:]
+
 
 def parse_json(json_str: str, is_chat_name: bool = False) -> dict:
     """
-    Parse JSON string output from Gemini API into structured data.
+    Parse JSON string output from an AI provider into structured data.
 
     Parameters
     ----------
     json_str : str
-        Raw JSON string from the API response
+        Raw JSON string from the API response (may include code fences or prose)
     is_chat_name : bool
         Whether the JSON string is a chat name or persona data
 
     Returns
     -------
     dict
-        Parsed JSON data with personas, or empty dict if parsing fails
+        Parsed JSON data with personas, or empty dict if parsing/validation fails.
+        Malformed output (empty dict) is treated as upstream failure by callers
+        and surfaces as HTTP 502, not 503.
 
     Raises
     ------
@@ -46,6 +97,10 @@ def parse_json(json_str: str, is_chat_name: bool = False) -> dict:
     defined in the refined_generation_prompt. It ensures all required fields
     are present and have the correct data types.
     """
+    # Strip code fences and extract the first balanced JSON object from any
+    # surrounding prose before attempting to parse.
+    json_str = _extract_json_object(json_str)
+
     try:
         # Parse the JSON string
         parsed_data = json.loads(json_str)
@@ -145,23 +200,17 @@ def generate_chat_name(first_message: str) -> dict:
 
     Parameters
     ----------
-    text : str
+    first_message : str
         First chat message to generate name for
 
     Returns
     -------
     dict
         Parsed and validated chat name data, or empty dict if parsing fails
-
-    Notes
-    -----
-    This function calls the Gemini API with the refined generation prompt to
-    create a chat name based on the first chat message. The response is
-    automatically parsed and validated against the expected schema before
-    being returned.
     """
     client = genai.Client(
         api_key=os.environ.get("GOOGLE_API_KEY"),
+        http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT * 1000),
     )
 
     model = "gemini-2.5-flash-lite"
@@ -195,9 +244,61 @@ def generate_chat_name(first_message: str) -> dict:
     return parsed_chat_name
 
 
+def generate_personas_groq(text: str, generated_persona: Optional[str] = None) -> dict:
+    """
+    Generate user personas using Groq's OpenAI-compatible API.
+
+    This is a fallback for when Gemini is rate-limited. Malformed or schema-invalid
+    output returns {} (same as Gemini path), which callers surface as HTTP 502 — not
+    as 503 capacity. Only rate-limit and auth errors propagate as AllProvidersRateLimitedError.
+
+    Parameters
+    ----------
+    text : str
+        Product description or concept text
+    generated_persona : Optional[str]
+        Optional existing persona JSON for follow-up refinement
+
+    Returns
+    -------
+    dict
+        Parsed and validated persona data, or empty dict if parsing fails
+    """
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+        timeout=GROQ_TIMEOUT,
+    )
+
+    if generated_persona is None:
+        system_prompt = refined_generation_prompt
+        user_content = text
+    else:
+        system_prompt = user_follow_up_prompt
+        user_content = (
+            f"User Follow-up request: {text}\n"
+            f"Last generated persona json: {generated_persona}"
+        )
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.7,
+    )
+    raw = response.choices[0].message.content or ""
+    return parse_json(raw)
+
+
 def generate_personas(text: str, generated_persona: Optional[str] = None) -> dict:
     """
-    Generate user personas based on the provided text using Gemini API.
+    Generate user personas based on the provided text using Gemini API,
+    falling back to Groq on rate-limit (429).
 
     Parameters
     ----------
@@ -211,22 +312,22 @@ def generate_personas(text: str, generated_persona: Optional[str] = None) -> dic
     dict
         Parsed and validated persona data, or empty dict if parsing fails
 
-    Notes
-    -----
-    This function calls the Gemini API with the refined generation prompt to
-    create hypothetical user personas. The response is automatically parsed
-    and validated against the expected schema before being returned.
-
-    The generated personas include primary and secondary user types with
-    detailed information about demographics, goals, frustrations, and
-    research assumptions for user validation studies.
+    Raises
+    ------
+    AllProvidersRateLimitedError
+        When both Gemini returned 429 AND Groq is rate-limited or misconfigured.
+    google.genai.errors.ClientError
+        Non-429 Gemini client errors (auth, billing, etc.) propagate as-is.
+    Exception
+        Other Groq errors (network, invalid model name, etc.) propagate as-is → 500.
     """
     client = genai.Client(
         api_key=os.environ.get("GOOGLE_API_KEY"),
+        http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT * 1000),
     )
 
     model = "gemini-2.5-flash-lite"
-    if generated_persona == None:
+    if generated_persona is None:
         contents = [
             types.Content(
                 role="user",
@@ -266,17 +367,34 @@ def generate_personas(text: str, generated_persona: Optional[str] = None) -> dic
             ],
         )
 
-    output = client.models.generate_content(
-        model=model,
-        contents=contents,
-        config=generate_content_config,
-    )
+    try:
+        output = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
+        )
+        raw_output_str = output.candidates[0].content.parts[0].text
+        return parse_json(raw_output_str)
+    except genai_errors.ClientError as e:
+        if e.code != 429:
+            # Auth failure, billing issue, or other 4xx — don't mask as capacity
+            raise
+        print(f"Gemini rate-limited (429 {e.status}). Falling back to Groq.")
 
-    raw_output_str = output.candidates[0].content.parts[0].text
+    # --- Groq fallback ---
+    # If GROQ_API_KEY is not set, the client constructor raises before we ever reach
+    # the except block below. Check early so missing config surfaces as 503 capacity
+    # (not an unhandled 500).
+    if not os.environ.get("GROQ_API_KEY"):
+        raise AllProvidersRateLimitedError()
 
-    # Parse and validate the JSON output
-    parsed_personas = parse_json(raw_output_str)
-    return parsed_personas
+    # If Gemini is rate-limited and Groq is also unavailable (rate-limited or
+    # misconfigured), the net result is no capacity — surface as 503.
+    try:
+        return generate_personas_groq(text, generated_persona)
+    except (OpenAIRateLimitError, OpenAIAuthError):
+        raise AllProvidersRateLimitedError()
+    # Other Groq exceptions (network error, invalid model, etc.) propagate → 500
 
 
 if __name__ == "__main__":

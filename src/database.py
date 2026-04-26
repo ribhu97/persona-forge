@@ -1,13 +1,33 @@
 from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy import event
 from typing import Generator
-
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 sqlite_file_name = os.getenv("SQLITE_PATH", "/data/database.db")
 sqlite_url = os.getenv("DATABASE_URL", f"sqlite:///{sqlite_file_name}")
 
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, connect_args=connect_args)
+
+if sqlite_url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute("PRAGMA journal_mode=WAL")
+            result = cur.fetchone()
+            if result and result[0].lower() != "wal":
+                logger.warning("SQLite WAL mode not set (got %s). Continuing without WAL.", result[0])
+        except Exception as e:
+            logger.warning("Failed to set WAL mode: %s. Continuing.", e)
+        try:
+            cur.execute("PRAGMA busy_timeout=10000")  # 10 s queue before raising OperationalError
+        except Exception as e:
+            logger.warning("Failed to set busy_timeout: %s", e)
+        cur.close()
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
