@@ -5,7 +5,7 @@ from typing import Annotated
 
 from src.database import get_session
 from src.models import User, OneTimePassword
-from src.schemas import UserCreate, UserLogin, OTPVerify, GoogleLogin, Token
+from src.schemas import UserCreate, UserLogin, OTPVerify, GoogleLogin, Token, UserResponse
 from src.auth import (
     get_password_hash, verify_password, create_access_token, 
     generate_otp, verify_google_token, ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -31,21 +31,29 @@ async def signup(user_in: UserCreate, session: Annotated[Session, Depends(get_se
         auth_provider="email"
     )
     session.add(user)
-    session.commit()
-    session.refresh(user)
-    
-    # Generate and send OTP
+    # Flush to get user.id for the OTP FK — don't commit yet so we can roll back if email fails
+    session.flush()
+
     otp_code = generate_otp()
     otp = OneTimePassword(
-        user_id=user.id, 
-        code=otp_code, 
+        user_id=user.id,
+        code=otp_code,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
     )
     session.add(otp)
+    session.flush()
+
+    # Send email before committing — roll back both user and OTP if it fails
+    try:
+        send_otp_email(user.email, otp_code)
+    except Exception:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email. Please try again."
+        )
+
     session.commit()
-    
-    send_otp_email(user.email, otp_code)
-    
     return {"message": "User created. Please verify your email with the OTP sent."}
 
 @router.post("/verify-otp", response_model=Token)
@@ -122,6 +130,6 @@ async def google_login(data: GoogleLogin, session: Annotated[Session, Depends(ge
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user
