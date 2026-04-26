@@ -12,6 +12,44 @@ import type {
   Persona
 } from '@/types';
 
+export interface AppError {
+  message: string;
+  type: 'capacity' | 'limit' | 'auth' | 'generic';
+  status?: number;
+}
+
+export function normalizeApiError(error: any): AppError {
+  const status = error.response?.status;
+  const detail: string = error.response?.data?.detail ?? '';
+
+  if (status === 503 || status === 429) {
+    return {
+      type: 'capacity',
+      message: detail.startsWith('AT_CAPACITY:')
+        ? detail.replace('AT_CAPACITY:', '').trim()
+        : 'Service is currently at capacity. Please try again in a moment.',
+      status,
+    };
+  }
+  if (status === 403) {
+    return { type: 'limit', message: detail || 'Limit reached.', status };
+  }
+  if (status === 401) {
+    return { type: 'auth', message: 'Session expired. Please log in again.', status };
+  }
+  if (error.code === 'ECONNABORTED') {
+    return { type: 'generic', message: 'Request timeout — the server took too long to respond.' };
+  }
+  if (!error.response) {
+    return { type: 'generic', message: 'Network error — please check your connection.' };
+  }
+  return {
+    type: 'generic',
+    message: detail || error.message || 'An unexpected error occurred.',
+    status,
+  };
+}
+
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
   timeout: 300000, // 5 minutes for long-running generations
@@ -40,18 +78,12 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') localStorage.removeItem('token');
-      // Optionally redirect to login or clear auth state via store (handled in store)
     }
 
-    if (error.code === 'ECONNABORTED') {
-      error.message = 'Request timeout - the server took too long to respond';
-    } else if (error.response?.status === 500) {
-      error.message = 'Server error - please try again later';
-    } else if (error.response?.status === 400) {
-      error.message = error.response.data?.detail || 'Invalid request';
-    } else if (!error.response) {
-      error.message = 'Network error - please check your connection';
-    }
+    const appError = normalizeApiError(error);
+    error.appError = appError;
+    // Keep error.message in sync for any catch blocks that read it directly
+    error.message = appError.message;
 
     return Promise.reject(error);
   }

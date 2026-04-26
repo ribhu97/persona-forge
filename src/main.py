@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from sqlalchemy.exc import OperationalError
+import logging
 import os
 
 # Load environment variables early
@@ -16,9 +19,16 @@ from src.routers.personas import router as personas_router
 from src.routers.blog import router as blog_router
 import uvicorn
 
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    if not os.environ.get("GROQ_API_KEY"):
+        logger.warning(
+            "GROQ_API_KEY is not set. Groq fallback is disabled. "
+            "Gemini rate-limit failures will surface as 503 with no fallback."
+        )
     yield
 
 app = FastAPI(
@@ -27,6 +37,18 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+
+@app.exception_handler(OperationalError)
+async def db_error_handler(request, exc):
+    if "database is locked" in str(exc).lower():
+        logger.warning("SQLite lock hit on %s", request.url.path)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "AT_CAPACITY: We are currently at capacity. Please try again in a moment."},
+        )
+    logger.error("DB OperationalError on %s: %s", request.url.path, exc)
+    return JSONResponse(status_code=500, content={"detail": "A database error occurred."})
 
 # Add CORS middleware
 import os
