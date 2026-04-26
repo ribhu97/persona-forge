@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { chatAPI } from '@/lib/api';
+import type { AppError } from '@/lib/api';
 import type { Conversation, Message } from '@/types';
 
 interface ChatStore {
@@ -8,12 +9,16 @@ interface ChatStore {
     messages: Message[];
     isLoading: boolean;
     error: string | null;
+    errorType: AppError['type'] | null;
+    lastFailedContent: string | null;
+    lastFailedConversationId: number | null;
 
     // Actions
     fetchConversations: () => Promise<void>;
     createConversation: (title?: string) => Promise<Conversation>;
     selectConversation: (id: number) => Promise<void>;
     sendMessage: (content: string) => Promise<void>;
+    retryMessage: () => Promise<void>;
     clearCurrentConversation: () => void;
     deleteConversation: (id: number) => Promise<void>;
     reset: () => void;
@@ -25,21 +30,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     messages: [],
     isLoading: false,
     error: null,
+    errorType: null,
+    lastFailedContent: null,
+    lastFailedConversationId: null,
 
     fetchConversations: async () => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, errorType: null });
         try {
             const conversations = await chatAPI.getConversations();
             set({ conversations });
         } catch (error: any) {
-            set({ error: error.message });
+            const appError = error.appError ?? { message: error.message, type: 'generic' as const };
+            set({ error: appError.message, errorType: 'generic' });
         } finally {
             set({ isLoading: false });
         }
     },
 
     createConversation: async (title?: string) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, errorType: null });
         try {
             const conversation = await chatAPI.createConversation(title);
             set(state => ({
@@ -49,7 +58,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             }));
             return conversation;
         } catch (error: any) {
-            set({ error: error.message });
+            const appError = error.appError ?? { message: error.message, type: 'generic' as const };
+            set({ error: appError.message, errorType: 'generic' });
             throw error;
         } finally {
             set({ isLoading: false });
@@ -57,12 +67,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     selectConversation: async (id: number) => {
-        set({ currentConversationId: id, isLoading: true, error: null });
+        set({
+            currentConversationId: id,
+            isLoading: true,
+            error: null,
+            errorType: null,
+            // Clear capacity state so the banner and retry button don't bleed
+            // across conversations — retry would silently no-op on the wrong thread.
+            lastFailedContent: null,
+            lastFailedConversationId: null,
+        });
         try {
             const messages = await chatAPI.getMessages(id);
             set({ messages });
         } catch (error: any) {
-            set({ error: error.message });
+            const appError = error.appError ?? { message: error.message, type: 'generic' as const };
+            set({ error: appError.message, errorType: 'generic' });
         } finally {
             set({ isLoading: false });
         }
@@ -72,7 +92,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const { currentConversationId } = get();
         if (!currentConversationId) return;
 
-        set({ isLoading: true, error: null });
+        // Capture before async work so retry/rollback use the right values.
+        const capturedConvId = currentConversationId;
+
+        set({ isLoading: true, error: null, errorType: null });
 
         // Optimistic update
         const tempMessage: Message = {
@@ -87,30 +110,40 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }));
 
         try {
-            const response = await chatAPI.sendMessage(currentConversationId, content);
-
-            // Replace temp message with real one and add assistant response
-            // Note: The backend returns the assistant message. We need to fetch updated messages or handle this carefully.
-            // For now, let's just append the assistant message returned by the API.
-            // Ideally we should replace the temp message with the real user message too if the API returned it, 
-            // but our API currently returns the Assistant message.
+            const response = await chatAPI.sendMessage(capturedConvId, content);
 
             set(state => ({
-                messages: [...state.messages, response] // Response is the assistant message
+                messages: [...state.messages, response],
+                error: null,
+                errorType: null,
+                lastFailedContent: null,
+                lastFailedConversationId: null,
             }));
 
-            // Also update the conversation list to show new timestamp/preview if we had that info
-            // For now just re-fetch conversations to update order
             get().fetchConversations();
 
         } catch (error: any) {
+            const appError: AppError = error.appError ?? { message: error.message, type: 'generic' as const };
+
             set(state => ({
-                error: error.message,
-                messages: state.messages.filter(m => m.id !== tempMessage.id) // Rollback
+                error: appError.message,
+                errorType: appError.type,
+                // Only preserve retry context for capacity errors — other error types
+                // (limit, auth, generic) don't benefit from a blind retry.
+                lastFailedContent: appError.type === 'capacity' ? content : null,
+                lastFailedConversationId: appError.type === 'capacity' ? capturedConvId : null,
+                messages: state.messages.filter(m => m.id !== tempMessage.id),
             }));
         } finally {
             set({ isLoading: false });
         }
+    },
+
+    retryMessage: async () => {
+        const { lastFailedContent, lastFailedConversationId, currentConversationId, isLoading } = get();
+        // Guard against: no pending retry, already loading, or user switched conversations.
+        if (isLoading || !lastFailedContent || lastFailedConversationId !== currentConversationId) return;
+        await get().sendMessage(lastFailedContent);
     },
 
     clearCurrentConversation: () => {
@@ -126,7 +159,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 messages: state.currentConversationId === id ? [] : state.messages
             }));
         } catch (error: any) {
-            set({ error: error.message });
+            const appError = error.appError ?? { message: error.message, type: 'generic' as const };
+            set({ error: appError.message, errorType: 'generic' });
             throw error;
         }
     },
@@ -137,7 +171,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             currentConversationId: null,
             messages: [],
             error: null,
-            isLoading: false
+            errorType: null,
+            isLoading: false,
+            lastFailedContent: null,
+            lastFailedConversationId: null,
         });
     }
 }));

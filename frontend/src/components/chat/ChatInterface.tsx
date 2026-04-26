@@ -3,6 +3,7 @@ import { Send, Bot, User as UserIcon, Loader2, MessageSquare } from 'lucide-reac
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
 import { LimitBanner } from '@/components/ui/LimitBanner';
+import { CapacityBanner } from '@/components/ui/CapacityBanner';
 import { useNavigate } from 'react-router-dom';
 
 interface ChatInterfaceProps {
@@ -10,7 +11,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ className }: ChatInterfaceProps) {
-    const { messages, sendMessage, isLoading, error } = useChatStore();
+    const { messages, sendMessage, isLoading, error, errorType, retryMessage } = useChatStore();
     const navigate = useNavigate();
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -112,10 +113,16 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
 
                 {error && (
                     <div className="mx-auto max-w-3xl">
-                        {error.toLowerCase().includes('limit') ? (
+                        {errorType === 'limit' ? (
                             <LimitBanner
                                 message={error}
                                 onUpgradeClick={() => navigate('/pricing')}
+                            />
+                        ) : errorType === 'capacity' ? (
+                            <CapacityBanner
+                                message={error}
+                                onRetry={retryMessage}
+                                isRetrying={isLoading}
                             />
                         ) : (
                             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
