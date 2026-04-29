@@ -48,7 +48,7 @@ export default function AppLayout() {
   const layout = (
     <HelmetProvider>
       <Outlet context={{ onLogin: openLogin } satisfies AppOutletContext} />
-      <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />
+      {!import.meta.ssr && <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />}
     </HelmetProvider>
   );
 
