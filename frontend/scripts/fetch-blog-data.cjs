@@ -16,7 +16,7 @@ if (!process.env.VITE_API_URL) {
     }
 }
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = process.env.VITE_API_URL || 'https://personaforge.pehloo.xyz/api/v1';
 const OUTPUT_PATH = path.resolve(__dirname, '../.generated/blog-posts.json');
 const BASELINE_PATH = OUTPUT_PATH; // same file; baseline = committed version
 

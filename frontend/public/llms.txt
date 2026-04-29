@@ -22,6 +22,13 @@ Persona Forge uses Google Gemini AI to generate detailed user personas from prod
 
 Persona Forge is a product by Pehloo. It is designed to replace hours of manual persona research with AI-assisted generation that follows established UX research frameworks.
 
+## Blog Posts
+
+- [User Personas vs. Buyer Personas: What's the Difference?](https://personaforge.pehloo.xyz/blog/user-personas-vs-buyer-personas): A breakdown of the critical differences between the people who use your product and the people who pay for it.
+- [5 Common Mistakes When Creating User Personas](https://personaforge.pehloo.xyz/blog/5-common-mistakes-user-personas): Avoid these critical errors that turn useful user personas into ignored PDF documents gathering dust on a shared drive.
+- [AI-Powered Persona Generation: The Future of UX Research](https://personaforge.pehloo.xyz/blog/ai-powered-persona-generation-future-ux): How artificial intelligence is transforming UX research, making persona generation faster, more accurate, and more accessible to all teams.
+- [How to Create Data-Driven User Personas](https://personaforge.pehloo.xyz/blog/how-to-create-data-driven-user-personas): Move beyond guesswork. Learn the step-by-step process of creating accurate user personas using quantitative data and qualitative insights.
+- [What Are User Personas and Why Do They Matter?](https://personaforge.pehloo.xyz/blog/what-are-user-personas-and-why-do-they-matter): A comprehensive guide to understanding user personas, their importance in product development, and how they bridge the gap between assumptions and reality.
 
 ## Optional
 
