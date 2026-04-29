@@ -21,6 +21,11 @@ export function useAppContext() {
 export default function AppLayout() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Gate client-only components (AuthDialog, GoogleOAuthProvider) behind mount state.
+  // useEffect never runs during SSG, so isMounted stays false for pre-rendered HTML.
+  useEffect(() => setIsMounted(true), []);
 
   // Rehydrate Zustand persist store and check auth on mount (browser-only)
   useEffect(() => {
@@ -45,18 +50,19 @@ export default function AppLayout() {
 
   const openLogin = () => setIsAuthDialogOpen(true);
 
-  const layout = (
+  const content = (
     <HelmetProvider>
       <Outlet context={{ onLogin: openLogin } satisfies AppOutletContext} />
-      {!import.meta.ssr && <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />}
+      {isMounted && <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />}
     </HelmetProvider>
   );
 
-  if (!googleClientId) return layout;
+  // GoogleOAuthProvider also requires browser APIs — only mount after hydration
+  if (!isMounted || !googleClientId) return content;
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      {layout}
+      {content}
     </GoogleOAuthProvider>
   );
 }
