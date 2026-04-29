@@ -1,6 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 
+// Load .env if VITE_API_URL isn't already in the environment
+// (Vite loads .env automatically during builds, but plain `node` does not)
+if (!process.env.VITE_API_URL) {
+    const envPath = path.resolve(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+        for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+            const match = line.match(/^VITE_API_URL\s*=\s*(.+)$/);
+            if (match) {
+                process.env.VITE_API_URL = match[1].trim().replace(/^["']|["']$/g, '');
+                break;
+            }
+        }
+    }
+}
+
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
 const OUTPUT_PATH = path.resolve(__dirname, '../.generated/blog-posts.json');
 const BASELINE_PATH = OUTPUT_PATH; // same file; baseline = committed version
