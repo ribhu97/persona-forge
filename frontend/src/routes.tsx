@@ -19,7 +19,7 @@ async function getBlogDataPath() {
 
 // Blog loaders — use fs at build/SSR time, fetch API at client runtime
 async function blogListLoader() {
-  if (import.meta.ssr) {
+  if (import.meta.env.SSR) {
     const { readFileSync } = await import('node:fs')
     const dataPath = await getBlogDataPath()
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
@@ -35,7 +35,7 @@ async function blogListLoader() {
 
 async function blogPostLoader({ params }: LoaderFunctionArgs) {
   const { slug } = params
-  if (import.meta.ssr) {
+  if (import.meta.env.SSR) {
     const { readFileSync } = await import('node:fs')
     const dataPath = await getBlogDataPath()
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
