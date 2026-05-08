@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Codebase Navigation — MANDATORY
+
+You MUST use token-savior MCP tools FIRST.
+
+- ALWAYS start with: find_symbol, get_function_source, get_class_source,
+  search_codebase, get_dependencies, get_dependents, get_change_impact
+- Only fall back to Read/Grep when token-savior tools genuinely don't cover it
+- If you catch yourself reaching for grep to find code, STOP
+
 ## Project Overview
 
 This is a full-stack User Persona Generator application with a FastAPI backend and React frontend. The application uses Google's Gemini AI to create detailed user personas from product descriptions and file uploads, featuring an intuitive Claude Artifacts-style interface.

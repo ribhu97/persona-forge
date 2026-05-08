@@ -1,7 +1,8 @@
 import { useDropzone } from 'react-dropzone';
 import { X, FileText, Image, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ACCEPTED_TYPES, useFileUpload, UploadState } from '@/hooks/useFileUpload';
+import { ACCEPTED_TYPES, useFileUpload } from '@/hooks/useFileUpload';
+import type { UploadState } from '@/hooks/useFileUpload';
 
 interface FileUploadProps {
   onFileReady: (fileId: string, filename: string) => void;

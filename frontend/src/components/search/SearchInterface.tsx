@@ -123,7 +123,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
             className={cn(
               "relative bg-background border-2 border-border p-6 transition-all duration-300 ease-out",
               "hover:border-black dark:hover:border-white focus-within:border-primary",
-              isDragActive && "border-primary bg-primary/5",
+              isDragActive && "border-dashed border-primary bg-primary/5",
             )}
           >
             <input {...getInputProps()} />
