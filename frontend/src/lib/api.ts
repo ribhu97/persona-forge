@@ -9,7 +9,8 @@ import type {
   ExportStatus,
   ExportFormat,
   BackendPersona,
-  Persona
+  Persona,
+  UploadResponse,
 } from '@/types';
 
 export interface AppError {
@@ -120,7 +121,10 @@ export const personaAPI = {
   generatePersonas: async (data: GeneratePersonasRequest): Promise<PersonaResponse> => {
     const response = await apiClient.post<ApiResponse<PersonaResponse>>(
       '/conversations/generate-personas',
-      { text: data.text }
+      {
+        text: data.text,
+        ...(data.fileId ? { file_id: data.fileId } : {}),
+      }
     );
 
     if (!response.data.success) {
@@ -135,13 +139,11 @@ export const personaAPI = {
     return response.data;
   },
 
-  // Future endpoint for file uploads
-  uploadFiles: async (files: File[]): Promise<any> => {
+  uploadFile: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
-
-    const response = await apiClient.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    formData.append('file', file);
+    const response = await apiClient.post<UploadResponse>('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
@@ -168,8 +170,11 @@ export const chatAPI = {
     return response.data;
   },
 
-  sendMessage: async (conversation_id: number, content: string): Promise<any> => {
-    const response = await apiClient.post(`/conversations/${conversation_id}/messages`, { content });
+  sendMessage: async (conversation_id: number, content: string, fileId?: string): Promise<any> => {
+    const response = await apiClient.post(`/conversations/${conversation_id}/messages`, {
+      content,
+      ...(fileId ? { file_id: fileId } : {}),
+    });
     return response.data;
   },
 

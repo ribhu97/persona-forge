@@ -63,8 +63,14 @@ class Message(SQLModel, table=True):
     conversation_id: int = Field(foreign_key="conversations.id", ondelete="CASCADE")
     role: str # user or assistant
     content: str
+    # File attachment metadata (stored on assistant message for conversation history)
+    attachment_filename: Optional[str] = None
+    attachment_file_type: Optional[str] = None
+    attachment_degraded_mode: bool = Field(default=False)
+    attachment_truncated: bool = Field(default=False)
+    attachment_char_count: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
     conversation: Conversation = Relationship(back_populates="messages")
     personas: List["Persona"] = Relationship(back_populates="message", sa_relationship_kwargs={"cascade": "all, delete"})
 
@@ -155,6 +161,23 @@ class ResearchAssumption(SQLModel, table=True):
     order_index: int
     
     persona: Persona = Relationship(back_populates="research_assumptions")
+
+class UploadedFile(SQLModel, table=True):
+    __tablename__ = "uploaded_files"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    file_id: str = Field(unique=True, index=True)  # UUID4
+    original_filename: str
+    file_type: str  # pdf, png, jpg, webp, txt, md, docx
+    file_size: int  # bytes
+    status: str = Field(default="uploaded")  # uploaded -> ready -> used -> expired
+    gemini_file_uri: Optional[str] = None
+    extracted_text: Optional[str] = None
+    extracted_char_count: Optional[int] = None
+    truncated: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(default=None)
+
 
 class BlogPost(SQLModel, table=True):
     __tablename__ = "blog_posts"

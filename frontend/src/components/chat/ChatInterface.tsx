@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, MessageSquare } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, MessageSquare, AlertTriangle, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chatStore';
 import { LimitBanner } from '@/components/ui/LimitBanner';
 import { CapacityBanner } from '@/components/ui/CapacityBanner';
+import { FileUpload } from '@/components/chat/FileUpload';
 import { useNavigate } from 'react-router-dom';
 
 interface ChatInterfaceProps {
@@ -14,6 +15,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     const { messages, sendMessage, isLoading, error, errorType, retryMessage } = useChatStore();
     const navigate = useNavigate();
     const [input, setInput] = useState('');
+    const [attachedFileId, setAttachedFileId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -31,13 +33,15 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
 
         const content = input.trim();
         setInput('');
+        const fileId = attachedFileId;
+        setAttachedFileId(null);
 
         // Reset height
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
 
-        await sendMessage(content);
+        await sendMessage(content, fileId ?? undefined);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -92,6 +96,33 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                             )}>
                                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                             </div>
+
+                            {/* Attachment info on assistant messages */}
+                            {msg.role === 'assistant' && msg.attachment && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                                    <Paperclip className="h-3 w-3" />
+                                    <span>{msg.attachment.filename}</span>
+                                </div>
+                            )}
+
+                            {/* Degraded mode warning — persists in history */}
+                            {msg.role === 'assistant' && (msg.degraded_mode || msg.attachment?.degraded_mode) && (
+                                <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 max-w-md">
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                                    <span>
+                                        File processed in text-extraction mode — complex layouts, tables, and images may not be fully represented.
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Truncation warning */}
+                            {msg.role === 'assistant' && msg.attachment?.truncated && (
+                                <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 max-w-md">
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600" />
+                                    <span>Only the first portion of your document was used.</span>
+                                </div>
+                            )}
+
                             <span className="text-xs text-muted-foreground block px-1">
                                 {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
@@ -139,6 +170,12 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             <div className="p-4 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="max-w-3xl mx-auto relative">
                     <form onSubmit={handleSubmit} className="relative flex items-end gap-2 p-2 bg-muted/50 rounded-xl border border-input focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
+                        <FileUpload
+                            onFileReady={(fileId) => setAttachedFileId(fileId)}
+                            onFileRemoved={() => setAttachedFileId(null)}
+                            disabled={isLoading}
+                            className="mb-0.5"
+                        />
                         <textarea
                             ref={textareaRef}
                             value={input}

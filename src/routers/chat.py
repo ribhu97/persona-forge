@@ -9,11 +9,13 @@ from sqlalchemy.exc import OperationalError
 from src.models import (
     User, Conversation, Message, Persona, Demographics, Goal,
     Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
+    UploadedFile,
 )
-from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse
+from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse, AttachmentInfo
 from src.dependencies import get_current_user, effective_account_type
 from src.generator import generate_personas, generate_chat_name
 from src.exceptions import AllProvidersRateLimitedError
+from src.file_utils import cleanup_gemini_file
 from google.genai import errors as genai_errors
 from sqlalchemy import func
 
@@ -46,6 +48,53 @@ def check_conversation_limit(user: User, session: Session):
             status_code=403,
             detail=f"Monthly conversation limit reached ({count}/{friendly_limit}). Upgrade to create more.",
         )
+
+
+def resolve_file_context(file_id: str, user_id: int, session) -> dict:
+    """
+    Look up an UploadedFile by file_id and user_id, validate it is usable,
+    and return a file_context dict for the generator.
+
+    Raises HTTPException on: not found, wrong owner, expired, already used.
+    """
+    from datetime import datetime, timezone
+    record = session.exec(
+        select(UploadedFile).where(UploadedFile.file_id == file_id)
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Uploaded file not found or already expired.")
+    if record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You do not have access to this file.")
+    now = datetime.now(timezone.utc)
+    expires = record.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if now > expires:
+        raise HTTPException(status_code=410, detail="Uploaded file has expired. Please upload again.")
+    if record.status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail="This file has already been used or is not ready. Please upload again.",
+        )
+
+    return {
+        "file_type": record.file_type,
+        "gemini_file_uri": record.gemini_file_uri,
+        "extracted_text": record.extracted_text,
+        "degraded_mode": False,
+        # Metadata for attachment recording
+        "_record": record,
+    }
+
+
+def mark_file_used(record: UploadedFile, session) -> None:
+    """Mark a file record as used and trigger best-effort Gemini cleanup."""
+    record.status = "used"
+    session.add(record)
+    # Gemini cleanup happens after commit — best effort, outside transaction
+    if record.gemini_file_uri:
+        cleanup_gemini_file(record.gemini_file_uri)
 
 
 def _get_ordered_text(items, text_attr: str) -> list:
@@ -234,10 +283,21 @@ async def send_message(
         if personas_list:
             generated_persona_str = json.dumps({"personas": personas_list})
 
+    # Resolve optional file attachment
+    file_context = None
+    file_record = None
+    if data.file_id:
+        file_context = resolve_file_context(data.file_id, user.id, session)
+        file_record = file_context.pop("_record")
+
     # Call generation API — do this BEFORE writing anything to the DB so a failed
     # generation doesn't consume the user's message quota.
     try:
-        persona_data = generate_personas(data.content, generated_persona=generated_persona_str)
+        persona_data = generate_personas(
+            data.content,
+            generated_persona=generated_persona_str,
+            file_context=file_context,
+        )
     except AllProvidersRateLimitedError:
         raise HTTPException(
             status_code=503,
@@ -256,6 +316,17 @@ async def send_message(
             detail="The AI returned an empty or invalid response. Your message was not counted. Please try again.",
         )
 
+    degraded_mode = bool(file_context and file_context.get("degraded_mode"))
+    warnings: list[str] = []
+    if degraded_mode:
+        ft = file_context.get("file_type", "file") if file_context else "file"
+        warnings.append(
+            f"File processed in text-extraction mode — complex layouts, tables, and images "
+            f"in your {ft.upper()} may not be fully represented."
+        )
+        if ft in ("png", "jpg", "webp"):
+            warnings.append("Image attachments are not supported with the current AI provider. The image was skipped.")
+
     # Generation succeeded — now persist everything in one transaction
     try:
         user_msg = Message(conversation_id=conv.id, role="user", content=data.content)
@@ -267,17 +338,38 @@ async def send_message(
             conversation_id=conv.id,
             role="assistant",
             content=f"Generated {num_personas} personas based on your request.",
+            attachment_filename=file_record.original_filename if file_record else None,
+            attachment_file_type=file_record.file_type if file_record else None,
+            attachment_degraded_mode=degraded_mode,
+            attachment_truncated=file_record.truncated if file_record else False,
+            attachment_char_count=file_record.extracted_char_count if file_record else None,
         )
         session.add(asst_msg)
         session.flush()
 
         save_personas_to_db(session, asst_msg.id, user.id, persona_data["personas"])
 
+        if file_record:
+            mark_file_used(file_record, session)
+
         conv.last_message_at = datetime.now(timezone.utc)
         session.add(conv)
         session.commit()
         session.refresh(asst_msg)
-        return asst_msg
+
+        # Attach runtime warnings to response (not persisted — use attachment fields for history)
+        response = MessageResponse.model_validate(asst_msg)
+        response.degraded_mode = degraded_mode
+        response.warnings = warnings
+        if file_record:
+            response.attachment = AttachmentInfo(
+                filename=file_record.original_filename,
+                file_type=file_record.file_type,
+                degraded_mode=degraded_mode,
+                truncated=file_record.truncated,
+                char_count=file_record.extracted_char_count,
+            )
+        return response
     except OperationalError:
         session.rollback()
         raise  # propagates to @app.exception_handler(OperationalError) → 503
@@ -299,9 +391,16 @@ async def generate_personas_api(
 
     check_conversation_limit(user, session)
 
+    file_context = None
+    file_record = None
+    file_id = data.get("file_id")
+    if file_id:
+        file_context = resolve_file_context(file_id, user.id, session)
+        file_record = file_context.pop("_record")
+
     # Call generation API before writing to DB — don't consume the thread slot on failure
     try:
-        persona_data = generate_personas(text)
+        persona_data = generate_personas(text, file_context=file_context)
     except AllProvidersRateLimitedError:
         raise HTTPException(
             status_code=503,
@@ -320,6 +419,8 @@ async def generate_personas_api(
             detail="The AI returned an empty or invalid response. Please try again.",
         )
 
+    degraded_mode = bool(file_context and file_context.get("degraded_mode"))
+
     try:
         conv = Conversation(user_id=user.id, title=text[:50])
         session.add(conv)
@@ -329,14 +430,26 @@ async def generate_personas_api(
         session.add(user_msg)
         session.flush()
 
-        asst_msg = Message(conversation_id=conv.id, role="assistant", content="Generated personas")
+        asst_msg = Message(
+            conversation_id=conv.id,
+            role="assistant",
+            content="Generated personas",
+            attachment_filename=file_record.original_filename if file_record else None,
+            attachment_file_type=file_record.file_type if file_record else None,
+            attachment_degraded_mode=degraded_mode,
+            attachment_truncated=file_record.truncated if file_record else False,
+            attachment_char_count=file_record.extracted_char_count if file_record else None,
+        )
         session.add(asst_msg)
         session.flush()
 
         save_personas_to_db(session, asst_msg.id, user.id, persona_data["personas"])
 
+        if file_record:
+            mark_file_used(file_record, session)
+
         session.commit()
-        return {"success": True, "data": {"personas": persona_data["personas"]}}
+        return {"success": True, "data": {"personas": persona_data["personas"]}, "degraded_mode": degraded_mode}
     except OperationalError:
         session.rollback()
         raise  # propagates to @app.exception_handler(OperationalError) → 503
