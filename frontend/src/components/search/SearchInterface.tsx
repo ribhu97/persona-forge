@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { GenerationMode, ProcessedFile } from '@/types';
 import { cn } from '@/lib/utils';
 import { Loader2, Search, ChevronDown, Settings2 } from 'lucide-react';
 import { FileUpload } from '@/components/chat/FileUpload';
+import { ACCEPTED_TYPES, useFileUpload } from '@/hooks/useFileUpload';
 
 interface SearchData {
   text: string;
@@ -44,6 +46,20 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
   const [attachedFileId, setAttachedFileId] = useState<string | null>(null);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { handleFiles, handleRemove: handleFileRemoved, state: fileState, isUploading } = useFileUpload({
+    onFileReady: (fileId) => setAttachedFileId(fileId),
+    onFileRemoved: () => setAttachedFileId(null),
+  });
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: handleFiles,
+    accept: ACCEPTED_TYPES,
+    maxFiles: 1,
+    disabled: isLoading || isUploading,
+    noClick: true,   // clicks handled by the FileUpload button
+    noKeyboard: true,
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -102,7 +118,28 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
       {/* Integrated Search Bar */}
       <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto transition-all duration-500 ease-out">
         <div className="relative">
-          <div className="relative bg-background border-2 border-border p-6 hover:border-black dark:hover:border-white focus-within:border-primary transition-all duration-300 ease-out">
+          <div
+            {...getRootProps()}
+            className={cn(
+              "relative bg-background border-2 border-border p-6 transition-all duration-300 ease-out",
+              "hover:border-black dark:hover:border-white focus-within:border-primary",
+              isDragActive && "border-primary bg-primary/5",
+            )}
+          >
+            <input {...getInputProps()} />
+            {/* Drag overlay */}
+            {isDragActive && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <div className="flex flex-col items-center gap-2 text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span className="text-sm font-medium">Drop file to attach</span>
+                </div>
+              </div>
+            )}
             {/* Main Input Area */}
             <Textarea
               value={input}
@@ -121,11 +158,13 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border transition-all duration-300 ease-out">
               {/* Left Side Controls */}
               <div className="flex items-center gap-3">
-                {/* File Upload */}
+                {/* File Upload — click-to-browse; drag handled by the outer search box */}
                 <FileUpload
                   onFileReady={(fileId) => setAttachedFileId(fileId)}
                   onFileRemoved={() => setAttachedFileId(null)}
                   disabled={isLoading}
+                  externalState={fileState}
+                  externalHandleRemove={handleFileRemoved}
                 />
 
                 {/* Settings Button */}

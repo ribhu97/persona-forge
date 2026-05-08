@@ -1,31 +1,17 @@
-import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { X, FileText, Image, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { personaAPI } from '@/lib/api';
-import type { UploadResponse } from '@/types';
-
-const ACCEPTED_TYPES = {
-  'application/pdf': ['.pdf'],
-  'image/png': ['.png'],
-  'image/jpeg': ['.jpg', '.jpeg'],
-  'image/webp': ['.webp'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-  'text/plain': ['.txt'],
-  'text/markdown': ['.md'],
-};
-
-type UploadState =
-  | { status: 'idle' }
-  | { status: 'uploading' }
-  | { status: 'ready'; response: UploadResponse }
-  | { status: 'error'; message: string };
+import { ACCEPTED_TYPES, useFileUpload, UploadState } from '@/hooks/useFileUpload';
 
 interface FileUploadProps {
   onFileReady: (fileId: string, filename: string) => void;
   onFileRemoved: () => void;
   disabled?: boolean;
   className?: string;
+  /** When provided, the component uses this state instead of managing its own.
+   *  Use this when a parent (e.g. SearchInterface) owns the dropzone for a larger area. */
+  externalState?: UploadState;
+  externalHandleRemove?: () => void;
 }
 
 function fileIcon(filename: string) {
@@ -42,76 +28,60 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function FileUpload({ onFileReady, onFileRemoved, disabled, className }: FileUploadProps) {
-  const [state, setState] = useState<UploadState>({ status: 'idle' });
+export function FileUpload({
+  onFileReady,
+  onFileRemoved,
+  disabled,
+  className,
+  externalState,
+  externalHandleRemove,
+}: FileUploadProps) {
+  const internal = useFileUpload({ onFileReady, onFileRemoved });
+  const state = externalState ?? internal.state;
+  const handleRemove = externalHandleRemove ?? internal.handleRemove;
 
-  const handleDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
-      if (!file) return;
-
-      setState({ status: 'uploading' });
-      try {
-        const response = await personaAPI.uploadFile(file);
-        setState({ status: 'ready', response });
-        onFileReady(response.file_id, response.filename);
-      } catch (err: any) {
-        const detail =
-          err.response?.data?.detail ||
-          err.appError?.message ||
-          err.message ||
-          'Upload failed. Please try again.';
-        setState({ status: 'error', message: detail });
-      }
-    },
-    [onFileReady],
-  );
-
-  const handleRemove = () => {
-    setState({ status: 'idle' });
-    onFileRemoved();
-  };
-
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop: handleDrop,
+  // Click-to-browse only; drag is handled by the parent when externalState is used.
+  const { getInputProps, open } = useDropzone({
+    onDrop: internal.handleFiles,
     accept: ACCEPTED_TYPES,
     maxFiles: 1,
     disabled: disabled || state.status === 'uploading',
-    noClick: state.status !== 'idle',
-    noKeyboard: state.status !== 'idle',
+    noClick: true,
+    noKeyboard: true,
+    noDrag: !!externalState, // disable drag on this zone when parent owns it
   });
 
-  // Idle — show clickable dropzone trigger
   if (state.status === 'idle') {
     return (
-      <div
-        {...getRootProps()}
-        className={cn(
-          'flex items-center justify-center h-9 w-9 rounded-lg cursor-pointer',
-          'hover:bg-muted/60 transition-colors duration-200',
-          isDragActive && 'bg-primary/10 ring-2 ring-primary',
-          disabled && 'opacity-50 cursor-not-allowed',
-          className,
-        )}
-        title="Attach a file (PDF, image, DOCX, TXT, MD)"
-      >
+      <div className={cn(className)}>
         <input {...getInputProps()} />
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4 text-muted-foreground"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+        <button
+          type="button"
+          onClick={open}
+          disabled={disabled}
+          className={cn(
+            'flex items-center justify-center h-9 w-9 rounded-lg cursor-pointer',
+            'hover:bg-muted/60 transition-colors duration-200',
+            disabled && 'opacity-50 cursor-not-allowed',
+          )}
+          title="Attach a file (PDF, image, DOCX, TXT, MD)"
         >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-muted-foreground"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
       </div>
     );
   }
 
-  // Uploading
   if (state.status === 'uploading') {
     return (
       <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-lg text-sm', className)}>
@@ -121,13 +91,13 @@ export function FileUpload({ onFileReady, onFileRemoved, disabled, className }: 
     );
   }
 
-  // Error
   if (state.status === 'error') {
     return (
       <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-lg text-sm max-w-xs', className)}>
         <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
         <span className="text-destructive text-xs truncate">{state.message}</span>
         <button
+          type="button"
           onClick={handleRemove}
           className="ml-auto text-destructive hover:text-destructive/70 transition-colors"
           title="Dismiss"
@@ -138,7 +108,7 @@ export function FileUpload({ onFileReady, onFileRemoved, disabled, className }: 
     );
   }
 
-  // Ready — show file chip
+  // Ready — file chip
   const { response } = state;
   return (
     <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/60 rounded-lg text-sm max-w-xs', className)}>
@@ -157,6 +127,7 @@ export function FileUpload({ onFileReady, onFileRemoved, disabled, className }: 
       )}
       {!disabled && (
         <button
+          type="button"
           onClick={handleRemove}
           className="ml-auto text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Remove file"
