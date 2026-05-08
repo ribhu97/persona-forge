@@ -158,7 +158,7 @@ export function MainAppView() {
     setIsTransitioning(false);
   };
 
-  const handleSearch = async (data: { text: string; mode: any; files: any[] }) => {
+  const handleSearch = async (data: { text: string; mode: any; files: any[]; fileId?: string }) => {
     if (!isAuthenticated) {
       onLogin();
       return;
@@ -166,7 +166,7 @@ export function MainAppView() {
 
     try {
       await createConversation(data.text);
-      await sendMessage(data.text);
+      await sendMessage(data.text, data.fileId);
     } catch (err: any) {
       console.error('Failed to generate personas:', err);
     }

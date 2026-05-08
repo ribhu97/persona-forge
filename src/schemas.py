@@ -36,12 +36,33 @@ class UserResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+# File Upload Schemas
+class UploadedFileResponse(BaseModel):
+    file_id: str
+    filename: str
+    file_type: str
+    size: int
+    status: str
+    truncated: bool
+    char_count: Optional[int] = None
+    warnings: List[str] = []
+
+class AttachmentInfo(BaseModel):
+    filename: str
+    file_type: str
+    degraded_mode: bool = False
+    truncated: bool = False
+    char_count: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
 # Chat Schemas
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
 
 class MessageCreate(BaseModel):
     content: str
+    file_id: Optional[str] = None
 
 # Sub-item Schemas
 class DemographicsResponse(BaseModel):
@@ -132,7 +153,10 @@ class MessageResponse(BaseModel):
     content: str
     created_at: datetime
     personas: List[PersonaResponse] = []
-    
+    attachment: Optional[AttachmentInfo] = None
+    degraded_mode: bool = False
+    warnings: List[str] = []
+
     model_config = {"from_attributes": True}
 
 class ConversationResponse(BaseModel):

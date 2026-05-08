@@ -3,12 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { GenerationMode, ProcessedFile } from '@/types';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, Plus, ChevronDown, Settings2 } from 'lucide-react';
+import { Loader2, Search, ChevronDown, Settings2 } from 'lucide-react';
+import { FileUpload } from '@/components/chat/FileUpload';
 
 interface SearchData {
   text: string;
   mode: GenerationMode;
   files: ProcessedFile[];
+  fileId?: string;
 }
 
 interface SearchInterfaceProps {
@@ -39,6 +41,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<GenerationMode>('quick');
   const [files] = useState<ProcessedFile[]>([]);
+  const [attachedFileId, setAttachedFileId] = useState<string | null>(null);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +76,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
       text: input.trim(),
       mode,
       files,
+      fileId: attachedFileId ?? undefined,
     });
   };
 
@@ -117,17 +121,12 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border transition-all duration-300 ease-out">
               {/* Left Side Controls */}
               <div className="flex items-center gap-3">
-                {/* File Upload Button */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0 hover:bg-muted/60 transition-all duration-200 ease-out rounded-lg"
-                  disabled={true}
-                  title="Adding files to context coming soon"
-                >
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                </Button>
+                {/* File Upload */}
+                <FileUpload
+                  onFileReady={(fileId) => setAttachedFileId(fileId)}
+                  onFileRemoved={() => setAttachedFileId(null)}
+                  disabled={isLoading}
+                />
 
                 {/* Settings Button */}
                 <Button

@@ -10,10 +10,11 @@ import os
 # Load environment variables early
 load_dotenv()
 
-from src.database import create_db_and_tables
+from src.database import create_db_and_tables, get_session
 from src.routers.auth import router as auth_router
 from src.routers.chat import router as chat_router
 from src.routers.export import router as export_router
+from src.routers.files import router as files_router
 from src.routers.payments import router as payments_router
 from src.routers.personas import router as personas_router
 from src.routers.blog import router as blog_router
@@ -29,6 +30,14 @@ async def lifespan(app: FastAPI):
             "GROQ_API_KEY is not set. Groq fallback is disabled. "
             "Gemini rate-limit failures will surface as 503 with no fallback."
         )
+    # Clean up any orphaned upload records / Gemini files from previous runs
+    try:
+        from src.file_utils import sweep_expired_uploads
+        session = next(get_session())
+        sweep_expired_uploads(session)
+        session.close()
+    except Exception as e:
+        logger.warning("Startup file sweep failed (non-fatal): %s", e)
     yield
 
 app = FastAPI(
@@ -74,6 +83,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
+app.include_router(files_router, prefix="/api")
 app.include_router(payments_router, prefix="/api")
 app.include_router(personas_router, prefix="/api")
 app.include_router(blog_router, prefix="/api")

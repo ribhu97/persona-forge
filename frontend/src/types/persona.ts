@@ -88,17 +88,37 @@ export interface GeneratePersonasRequest {
   text: string;
   mode?: GenerationMode;
   files?: ProcessedFile[];
+  fileId?: string;
 }
 
 export interface ProcessedFile {
   id: string;
   name: string;
-  type: 'pdf' | 'image' | 'markdown';
+  type: 'pdf' | 'image' | 'markdown' | 'docx' | 'txt';
   size: number;
   content?: string;
   base64?: string;
   thumbnail?: string;
   metadata?: Record<string, any>;
+}
+
+export interface UploadResponse {
+  file_id: string;
+  filename: string;
+  file_type: string;
+  size: number;
+  status: string;
+  truncated: boolean;
+  char_count?: number;
+  warnings: string[];
+}
+
+export interface AttachmentInfo {
+  filename: string;
+  file_type: string;
+  degraded_mode: boolean;
+  truncated: boolean;
+  char_count?: number;
 }
 
 export interface ApiResponse<T> {

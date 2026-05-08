@@ -1,4 +1,4 @@
-import type { BackendPersona } from './persona';
+import type { BackendPersona, AttachmentInfo } from './persona';
 
 export interface Message {
     id: number;
@@ -6,6 +6,9 @@ export interface Message {
     content: string;
     created_at: string;
     personas?: BackendPersona[];
+    attachment?: AttachmentInfo;
+    degraded_mode?: boolean;
+    warnings?: string[];
 }
 
 export interface Conversation {

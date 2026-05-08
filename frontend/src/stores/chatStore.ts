@@ -17,7 +17,7 @@ interface ChatStore {
     fetchConversations: () => Promise<void>;
     createConversation: (title?: string) => Promise<Conversation>;
     selectConversation: (id: number) => Promise<void>;
-    sendMessage: (content: string) => Promise<void>;
+    sendMessage: (content: string, fileId?: string) => Promise<void>;
     retryMessage: () => Promise<void>;
     clearCurrentConversation: () => void;
     deleteConversation: (id: number) => Promise<void>;
@@ -88,7 +88,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
     },
 
-    sendMessage: async (content: string) => {
+    sendMessage: async (content: string, fileId?: string) => {
         const { currentConversationId } = get();
         if (!currentConversationId) return;
 
@@ -110,7 +110,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }));
 
         try {
-            const response = await chatAPI.sendMessage(capturedConvId, content);
+            const response = await chatAPI.sendMessage(capturedConvId, content, fileId);
 
             set(state => ({
                 messages: [...state.messages, response],
