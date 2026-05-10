@@ -75,6 +75,30 @@ def create_db_and_tables():
             cursor.execute("CREATE INDEX IF NOT EXISTS ix_users_last_export_at ON users (last_export_at)")
             print("Successfully added last_export_at column and index to users table")
 
+        # messages table migrations (file attachment metadata)
+        cursor.execute("PRAGMA table_info(messages)")
+        message_columns = [col[1] for col in cursor.fetchall()]
+
+        if message_columns and 'attachment_filename' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN attachment_filename VARCHAR")
+            print("Successfully added attachment_filename column to messages table")
+
+        if message_columns and 'attachment_file_type' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN attachment_file_type VARCHAR")
+            print("Successfully added attachment_file_type column to messages table")
+
+        if message_columns and 'attachment_degraded_mode' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN attachment_degraded_mode BOOLEAN DEFAULT 0")
+            print("Successfully added attachment_degraded_mode column to messages table")
+
+        if message_columns and 'attachment_truncated' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN attachment_truncated BOOLEAN DEFAULT 0")
+            print("Successfully added attachment_truncated column to messages table")
+
+        if message_columns and 'attachment_char_count' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN attachment_char_count INTEGER")
+            print("Successfully added attachment_char_count column to messages table")
+
         # payments table migrations
         cursor.execute("PRAGMA table_info(payments)")
         payment_columns = [col[1] for col in cursor.fetchall()]

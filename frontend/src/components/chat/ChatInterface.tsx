@@ -1,26 +1,35 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, MessageSquare, AlertTriangle, Paperclip } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useChatStore } from '@/stores/chatStore';
-import { LimitBanner } from '@/components/ui/LimitBanner';
-import { CapacityBanner } from '@/components/ui/CapacityBanner';
-import { FileUpload } from '@/components/chat/FileUpload';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from "react";
+import {
+    Send,
+    Bot,
+    User as UserIcon,
+    Loader2,
+    MessageSquare,
+    AlertTriangle,
+    Paperclip,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useChatStore } from "@/stores/chatStore";
+import { LimitBanner } from "@/components/ui/LimitBanner";
+import { CapacityBanner } from "@/components/ui/CapacityBanner";
+import { FileUpload } from "@/components/chat/FileUpload";
+import { useNavigate } from "react-router-dom";
 
 interface ChatInterfaceProps {
     className?: string;
 }
 
 export function ChatInterface({ className }: ChatInterfaceProps) {
-    const { messages, sendMessage, isLoading, error, errorType, retryMessage } = useChatStore();
+    const { messages, sendMessage, isLoading, error, errorType, retryMessage } =
+        useChatStore();
     const navigate = useNavigate();
-    const [input, setInput] = useState('');
+    const [input, setInput] = useState("");
     const [attachedFileId, setAttachedFileId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
     useEffect(() => {
@@ -32,20 +41,20 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
         if (!input.trim() || isLoading) return;
 
         const content = input.trim();
-        setInput('');
+        setInput("");
         const fileId = attachedFileId;
         setAttachedFileId(null);
 
         // Reset height
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = "auto";
         }
 
         await sendMessage(content, fileId ?? undefined);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             handleSubmit();
         }
@@ -53,7 +62,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
 
     const adjustTextareaHeight = () => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = "auto";
             textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
         }
     };
@@ -74,31 +83,49 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                         key={msg.id}
                         className={cn(
                             "flex gap-4 max-w-3xl mx-auto",
-                            msg.role === 'user' ? "flex-row-reverse" : "flex-row"
+                            msg.role === "user"
+                                ? "flex-row-reverse"
+                                : "flex-row",
                         )}
                     >
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                            msg.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                        )}>
-                            {msg.role === 'user' ? <UserIcon className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                        <div
+                            className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                msg.role === "user"
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground",
+                            )}
+                        >
+                            {msg.role === "user" ? (
+                                <UserIcon className="w-5 h-5" />
+                            ) : (
+                                <Bot className="w-5 h-5" />
+                            )}
                         </div>
 
-                        <div className={cn(
-                            "flex-1 space-y-2",
-                            msg.role === 'user' ? "text-right" : "text-left"
-                        )}>
-                            <div className={cn(
-                                "inline-block rounded-lg px-4 py-3 text-sm",
-                                msg.role === 'user'
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-foreground"
-                            )}>
-                                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        <div
+                            className={cn(
+                                "flex-1 space-y-2",
+                                msg.role === "user"
+                                    ? "text-right"
+                                    : "text-left",
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    "inline-block rounded-lg px-4 py-3 text-sm",
+                                    msg.role === "user"
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted text-foreground",
+                                )}
+                            >
+                                <p className="whitespace-pre-wrap leading-relaxed">
+                                    {msg.content}
+                                </p>
                             </div>
 
                             {/* Attachment info on assistant messages */}
-                            {msg.role === 'assistant' && msg.attachment && (
+                            {msg.role === "assistant" && msg.attachment && (
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
                                     <Paperclip className="h-3 w-3" />
                                     <span>{msg.attachment.filename}</span>
@@ -106,25 +133,36 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                             )}
 
                             {/* Degraded mode warning — persists in history */}
-                            {msg.role === 'assistant' && (msg.degraded_mode || msg.attachment?.degraded_mode) && (
-                                <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 max-w-md">
-                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
-                                    <span>
-                                        File processed in text-extraction mode — complex layouts, tables, and images may not be fully represented.
-                                    </span>
-                                </div>
-                            )}
+                            {msg.role === "assistant" &&
+                                (msg.degraded_mode ||
+                                    msg.attachment?.degraded_mode) && (
+                                    <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 max-w-md">
+                                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                                        <span>
+                                            File processed in text-extraction
+                                            mode — complex layouts, tables, and
+                                            images may not be fully represented.
+                                        </span>
+                                    </div>
+                                )}
 
                             {/* Truncation warning */}
-                            {msg.role === 'assistant' && msg.attachment?.truncated && (
-                                <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 max-w-md">
-                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600" />
-                                    <span>Only the first portion of your document was used.</span>
-                                </div>
-                            )}
+                            {msg.role === "assistant" &&
+                                msg.attachment?.truncated && (
+                                    <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 max-w-md">
+                                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600" />
+                                        <span>
+                                            Only the first portion of your
+                                            document was used.
+                                        </span>
+                                    </div>
+                                )}
 
                             <span className="text-xs text-muted-foreground block px-1">
-                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(msg.created_at).toLocaleTimeString(
+                                    [],
+                                    { hour: "2-digit", minute: "2-digit" },
+                                )}
                             </span>
                         </div>
                     </div>
@@ -144,12 +182,12 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
 
                 {error && (
                     <div className="mx-auto max-w-3xl">
-                        {errorType === 'limit' ? (
+                        {errorType === "limit" ? (
                             <LimitBanner
                                 message={error}
-                                onUpgradeClick={() => navigate('/pricing')}
+                                onUpgradeClick={() => navigate("/pricing")}
                             />
-                        ) : errorType === 'capacity' ? (
+                        ) : errorType === "capacity" ? (
                             <CapacityBanner
                                 message={error}
                                 onRetry={retryMessage}
@@ -169,7 +207,10 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             {/* Input Area */}
             <div className="p-4 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="max-w-3xl mx-auto relative">
-                    <form onSubmit={handleSubmit} className="relative flex items-end gap-2 p-2 bg-muted/50 rounded-xl border border-input focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="relative flex items-end gap-2 p-2 bg-muted/50 rounded-xl border border-input focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all"
+                    >
                         <FileUpload
                             onFileReady={(fileId) => setAttachedFileId(fileId)}
                             onFileRemoved={() => setAttachedFileId(null)}
@@ -184,7 +225,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                                 adjustTextareaHeight();
                             }}
                             onKeyDown={handleKeyDown}
-                            placeholder="Describe your user to generate personas..."
+                            placeholder="Refine your personas"
                             className="flex-1 min-h-[44px] max-h-[200px] bg-transparent border-0 focus:ring-0 resize-none py-3 px-2 text-sm placeholder:text-muted-foreground"
                             rows={1}
                         />
