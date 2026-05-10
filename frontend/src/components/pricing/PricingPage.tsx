@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Check, Sparkles, Zap, Crown, X, Loader2 } from 'lucide-react';
+import { Check, Sparkles, Zap, Crown, X, Loader2, ChevronDown } from 'lucide-react';
 import { paymentAPI } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -92,6 +92,29 @@ const LIFETIME_OFFER = {
     originalMonthlyPrice: { USD: '$5', INR: '₹500' },
     savings: { USD: 'Save $40+', INR: 'Save ₹4,000+' },
 };
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="border border-border">
+            <dt>
+                <button
+                    onClick={() => setOpen(o => !o)}
+                    className="w-full flex items-center justify-between gap-4 px-6 py-4 text-left"
+                    aria-expanded={open}
+                >
+                    <span className="font-mono font-bold text-sm tracking-wide text-foreground">{question}</span>
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
+                </button>
+            </dt>
+            {open && (
+                <dd className="px-6 pb-4 text-sm text-muted-foreground leading-relaxed">
+                    {answer}
+                </dd>
+            )}
+        </div>
+    );
+}
 
 interface PricingPageProps {
     className?: string;
@@ -360,6 +383,41 @@ export function PricingPage({ className, isAuthenticated, onLogin }: PricingPage
                     </div>
                 </div>
             </div>
+
+                {/* FAQ */}
+                <div className="mt-16 max-w-3xl mx-auto">
+                    <h2 className="text-2xl font-display tracking-tight text-center mb-8">FREQUENTLY ASKED QUESTIONS</h2>
+                    <dl className="space-y-2">
+                        {[
+                            {
+                                q: 'Can I cancel my subscription at any time?',
+                                a: 'Yes. You can cancel your Plus or Pro subscription at any time from your account settings. You will retain access to paid features until the end of your current billing period — no prorated refunds, no hidden fees.',
+                            },
+                            {
+                                q: 'What happens when I hit my monthly limits?',
+                                a: 'You will be notified as you approach your limits. Once reached, you can either wait for the next billing cycle or upgrade to a higher plan to continue generating personas immediately.',
+                            },
+                            {
+                                q: 'What is the Lifetime Plus Membership?',
+                                a: 'The Lifetime Plus Membership is a one-time payment that gives you permanent access to all Plus-tier features — exports, threads, and messages — without any recurring charges. It is ideal if you plan to use Persona Forge long-term.',
+                            },
+                            {
+                                q: 'Do you support team or agency plans?',
+                                a: 'Not yet. All plans are currently individual accounts. If you need bulk access or a team plan, reach out to us at ribhu.lahiri@gmail.com and we will work something out.',
+                            },
+                            {
+                                q: 'Which AI model powers persona generation?',
+                                a: 'We use the best available model for the job rather than locking in to a single provider. Currently that means a combination of Google Gemini and a high-capacity model served via Groq, with automatic failover between them. We continuously test new models as they are released and swap in whichever performs best for structured persona generation. For the current specifics, DM @ribhu97 on X.',
+                            },
+                            {
+                                q: 'Is my data used to train AI models?',
+                                a: 'No. Your product descriptions and uploaded files are used solely to generate your personas in that session. We do not store or share your inputs with third parties for training purposes.',
+                            },
+                        ].map(({ q, a }) => (
+                            <FaqItem key={q} question={q} answer={a} />
+                        ))}
+                    </dl>
+                </div>
 
             {/* Footer Note */}
             <p className="text-center text-sm text-muted-foreground mt-8">
