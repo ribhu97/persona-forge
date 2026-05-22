@@ -4,6 +4,7 @@ import type { LoaderFunctionArgs } from 'react-router-dom'
 // Lazy imports for page components (reduces initial bundle)
 import AppLayout from './App'
 import { MainAppView } from './components/MainAppView'
+import { PersonaChatPage } from './components/personaChat/PersonaChatPage'
 import { BlogListPage } from './components/blog/BlogListPage'
 import { BlogPostPage } from './components/blog/BlogPostPage'
 import { PricingPage } from './components/pricing/PricingPage'
@@ -67,6 +68,10 @@ export const routes: RouteRecord[] = [
       {
         index: true,
         element: <MainAppView />,
+      },
+      {
+        path: 'chat/:personaId',
+        element: <PersonaChatPage />,
       },
       {
         path: 'blog',

@@ -11,7 +11,7 @@ from src.models import (
     Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
     UploadedFile,
 )
-from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse, AttachmentInfo
+from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse, AttachmentInfo, PersonaResponse
 from src.dependencies import get_current_user, effective_account_type
 from src.generator import generate_personas, generate_chat_name
 from src.exceptions import AllProvidersRateLimitedError
@@ -449,7 +449,9 @@ async def generate_personas_api(
             mark_file_used(file_record, session)
 
         session.commit()
-        return {"success": True, "data": {"personas": persona_data["personas"]}, "degraded_mode": degraded_mode}
+        session.refresh(asst_msg)
+        db_personas = [PersonaResponse.model_validate(p) for p in asst_msg.personas]
+        return {"success": True, "data": {"personas": [p.model_dump() for p in db_personas]}, "degraded_mode": degraded_mode}
     except OperationalError:
         session.rollback()
         raise  # propagates to @app.exception_handler(OperationalError) → 503

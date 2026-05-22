@@ -13,7 +13,9 @@ from src.prompts import (
     chat_naming_prompt,
     refined_generation_prompt,
     user_follow_up_prompt,
+    persona_chat_system_prompt,
 )
+from src.schemas import PERSONA_CHAT_MOODS, PERSONA_CHAT_TRAIT_SOURCE_TYPES
 
 load_dotenv()
 
@@ -449,6 +451,147 @@ def generate_personas(
     except (OpenAIRateLimitError, OpenAIAuthError):
         raise AllProvidersRateLimitedError()
     # Other Groq exceptions (network error, invalid model, etc.) propagate → 500
+
+
+def _build_persona_system_prompt(persona_profile: dict) -> str:
+    """Populate the persona_chat_system_prompt template with persona data."""
+    demo = persona_profile.get("demographics") or {}
+
+    return persona_chat_system_prompt.format(
+        name=persona_profile.get("name", "Unknown"),
+        role=persona_profile.get("role", "Unknown"),
+        tech_comfort=persona_profile.get("tech_comfort", "medium"),
+        age=demo.get("age", "Unknown"),
+        location=demo.get("location", "Unknown"),
+        education=demo.get("education", "Unknown"),
+        industry=demo.get("industry", "Unknown"),
+        scenario_context=persona_profile.get("scenario_context") or "(none)",
+    )
+
+
+def _parse_persona_chat_response(raw: str) -> dict:
+    """Parse and validate a persona chat response, applying defaults on failure."""
+    try:
+        cleaned = _extract_json_object(raw)
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, TypeError):
+        return {"content": raw.strip(), "mood": "neutral", "trait": None}
+
+    if not isinstance(data, dict) or "content" not in data:
+        return {"content": str(data), "mood": "neutral", "trait": None}
+
+    mood = data.get("mood", "neutral")
+    if mood not in PERSONA_CHAT_MOODS:
+        print(f"[persona_chat] Unknown mood '{mood}', defaulting to 'neutral'")
+        mood = "neutral"
+    data["mood"] = mood
+
+    trait = data.get("trait")
+    if isinstance(trait, dict):
+        src_type = trait.get("source_type", "")
+        if src_type not in PERSONA_CHAT_TRAIT_SOURCE_TYPES:
+            print(f"[persona_chat] Unknown trait source_type '{src_type}', dropping trait")
+            data["trait"] = None
+    else:
+        data["trait"] = None
+
+    return data
+
+
+def generate_persona_chat_response(
+    persona_profile: dict,
+    message_history: list,
+    user_message: str,
+) -> dict:
+    """
+    Generate an in-character persona response.
+
+    Parameters
+    ----------
+    persona_profile : dict
+        Persona data dict with name, role, demographics, goals, etc.
+    message_history : list
+        List of dicts {"role": "user"|"persona", "content": str} — last 20 messages.
+    user_message : str
+        The new user message.
+
+    Returns
+    -------
+    dict
+        {"content": str, "mood": str, "trait": dict|None}
+
+    Raises
+    ------
+    AllProvidersRateLimitedError
+        When both Gemini and Groq are rate-limited.
+    Exception
+        Other errors propagate as-is.
+    """
+    system_prompt = _build_persona_system_prompt(persona_profile)
+
+    # Build Gemini conversation history (alternating user/model)
+    gemini_contents = []
+    for msg in message_history:
+        role = "user" if msg["role"] == "user" else "model"
+        gemini_contents.append(
+            types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
+        )
+    gemini_contents.append(
+        types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+    )
+
+    client = genai.Client(
+        api_key=os.environ.get("GOOGLE_API_KEY"),
+        http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT * 1000),
+    )
+
+    config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+        response_mime_type="application/json",
+        system_instruction=[types.Part.from_text(text=system_prompt)],
+    )
+
+    try:
+        output = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=gemini_contents,
+            config=config,
+        )
+        raw = output.candidates[0].content.parts[0].text
+        return _parse_persona_chat_response(raw)
+    except genai_errors.ClientError as e:
+        if e.code != 429:
+            raise
+        print("[persona_chat] Gemini rate-limited (429). Falling back to Groq.")
+
+    # --- Groq fallback ---
+    if not os.environ.get("GROQ_API_KEY"):
+        raise AllProvidersRateLimitedError()
+
+    try:
+        from openai import OpenAI
+        groq_client = OpenAI(
+            api_key=os.environ.get("GROQ_API_KEY"),
+            base_url="https://api.groq.com/openai/v1",
+            timeout=GROQ_TIMEOUT,
+        )
+        # Build OpenAI-style messages array
+        messages = [{"role": "system", "content": system_prompt + "\n\nIMPORTANT: Respond ONLY with a valid JSON object matching the output schema."}]
+        for msg in message_history:
+            role = "user" if msg["role"] == "user" else "assistant"
+            messages.append({"role": role, "content": msg["content"]})
+        messages.append({"role": "user", "content": user_message})
+
+        response = groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.7,
+        )
+        raw = response.choices[0].message.content or ""
+        return _parse_persona_chat_response(raw)
+    except (OpenAIRateLimitError, OpenAIAuthError):
+        raise AllProvidersRateLimitedError()
 
 
 if __name__ == "__main__":

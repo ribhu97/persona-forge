@@ -12,6 +12,18 @@ from src.dependencies import get_current_user
 
 router = APIRouter(prefix="/personas", tags=["personas"])
 
+@router.get("/{persona_id}", response_model=PersonaResponse)
+async def get_persona(
+    persona_id: int,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+):
+    persona = session.get(Persona, persona_id)
+    if not persona or persona.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Persona not found")
+    return persona
+
+
 @router.put("/{persona_id}", response_model=PersonaResponse)
 async def update_persona(
     persona_id: int,

@@ -18,6 +18,7 @@ from src.routers.files import router as files_router
 from src.routers.payments import router as payments_router
 from src.routers.personas import router as personas_router
 from src.routers.blog import router as blog_router
+from src.routers.persona_chat import router as persona_chat_router
 import uvicorn
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ app.include_router(files_router, prefix="/api")
 app.include_router(payments_router, prefix="/api")
 app.include_router(personas_router, prefix="/api")
 app.include_router(blog_router, prefix="/api")
+app.include_router(persona_chat_router, prefix="/api")
 
 @app.get("/")
 async def root():

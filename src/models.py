@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import UniqueConstraint
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -177,6 +178,35 @@ class UploadedFile(SQLModel, table=True):
     truncated: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime = Field(default=None)
+
+
+class PersonaChatSession(SQLModel, table=True):
+    __tablename__ = "persona_chat_sessions"
+    __table_args__ = (UniqueConstraint("user_id", "persona_id", name="uq_pcs_user_persona"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    persona_id: int = Field(foreign_key="personas.id", ondelete="CASCADE", index=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_message_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    messages: List["PersonaChatMessage"] = Relationship(back_populates="session", sa_relationship_kwargs={"cascade": "all, delete"})
+
+
+class PersonaChatMessage(SQLModel, table=True):
+    __tablename__ = "persona_chat_messages"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="persona_chat_sessions.id", ondelete="CASCADE", index=True)
+    role: str  # "user" or "persona"
+    content: str
+    mood: Optional[str] = None
+    trait_source_type: Optional[str] = None   # "GOAL", "FRUSTRATION", "BEHAVIORAL_PATTERN", "SCENARIO_CONTEXT"
+    trait_text: Optional[str] = None
+    trait_source_index: Optional[int] = None
+    feedback: Optional[str] = None            # "up", "down", or null
+    tags: Optional[str] = None               # JSON string: '["insight","friction"]'
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    session: PersonaChatSession = Relationship(back_populates="messages")
 
 
 class BlogPost(SQLModel, table=True):
