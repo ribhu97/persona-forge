@@ -559,10 +559,13 @@ def generate_persona_chat_response(
         )
         raw = output.candidates[0].content.parts[0].text
         return _parse_persona_chat_response(raw)
-    except genai_errors.ClientError as e:
-        if e.code != 429:
+    except (genai_errors.ClientError, genai_errors.ServerError) as e:
+        if e.code == 429:
+            print("[persona_chat] Gemini rate-limited (429). Falling back to Groq.")
+        elif e.code in (503, 500, 502, 504):
+            print(f"[persona_chat] Gemini server error ({e.code}). Falling back to Groq.")
+        else:
             raise
-        print("[persona_chat] Gemini rate-limited (429). Falling back to Groq.")
 
     # --- Groq fallback ---
     if not os.environ.get("GROQ_API_KEY"):

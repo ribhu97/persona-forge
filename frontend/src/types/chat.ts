@@ -48,6 +48,7 @@ export interface PersonaChatMessage {
   feedback?: 'up' | 'down' | null;
   tags: string[];
   created_at: string;
+  failed?: boolean;
 }
 
 export interface PersonaChatSessionState {

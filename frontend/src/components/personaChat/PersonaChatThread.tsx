@@ -13,6 +13,7 @@ interface Props {
   onSendSuggestion: (text: string) => void;
   onFeedback: (id: number, value: 'up' | 'down' | null) => void;
   onToggleTag: (id: number, tag: TagType) => void;
+  onRetry: (id: number, content: string) => void;
 }
 
 export function PersonaChatThread({
@@ -23,6 +24,7 @@ export function PersonaChatThread({
   onSendSuggestion,
   onFeedback,
   onToggleTag,
+  onRetry,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [hoveredSuggestion, setHoveredSuggestion] = useState<number | null>(null);
@@ -106,8 +108,10 @@ export function PersonaChatThread({
             message={msg}
             personaName={persona.name}
             showTrait={showTrait}
+            isLoading={isLoading}
             onFeedback={onFeedback}
             onToggleTag={onToggleTag}
+            onRetry={onRetry}
           />
         ))}
       </div>

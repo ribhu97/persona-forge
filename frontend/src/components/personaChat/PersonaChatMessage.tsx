@@ -26,28 +26,53 @@ interface Props {
   message: Msg;
   personaName: string;
   showTrait: boolean;
+  isLoading: boolean;
   onFeedback: (id: number, value: 'up' | 'down' | null) => void;
   onToggleTag: (id: number, tag: TagType) => void;
+  onRetry: (id: number, content: string) => void;
 }
 
-export function PersonaChatMessageBubble({ message, personaName, showTrait, onFeedback, onToggleTag }: Props) {
+export function PersonaChatMessageBubble({ message, personaName, showTrait, isLoading, onFeedback, onToggleTag, onRetry }: Props) {
   const [hoveredTag, setHoveredTag] = useState<TagType | null>(null);
   const [hoveredFb, setHoveredFb] = useState<'up' | 'down' | null>(null);
 
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end px-4 py-2" style={{ background: 'hsl(var(--background))' }}>
+      <div className="flex flex-col items-end px-4 py-2 gap-1" style={{ background: 'hsl(var(--background))' }}>
         <div
           className="max-w-[70%] px-4 py-3 text-sm"
           style={{
-            background: 'hsl(var(--foreground))',
-            color: 'hsl(var(--background))',
+            background: message.failed ? 'hsl(var(--muted))' : 'hsl(var(--foreground))',
+            color: message.failed ? 'hsl(var(--muted-foreground))' : 'hsl(var(--background))',
             fontFamily: 'var(--font-sans)',
             borderRadius: 0,
+            border: message.failed ? '1px solid #c0392b' : 'none',
           }}
         >
           {message.content}
         </div>
+        {message.failed && (
+          <div className="flex items-center gap-2 max-w-[70%]">
+            <span className="text-[10px] font-mono" style={{ color: '#c0392b' }}>
+              ✕ GENERATION FAILED
+            </span>
+            <button
+              onClick={() => onRetry(message.id, message.content)}
+              disabled={isLoading}
+              className="text-[10px] font-mono tracking-[0.12em] px-2 py-0.5 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                borderRadius: 0,
+                border: '1px solid #c0392b',
+                color: '#c0392b',
+                background: 'transparent',
+              }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = '#c0392b'; e.currentTarget.style.color = 'hsl(var(--background))'; } }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#c0392b'; }}
+            >
+              ↺ RETRY
+            </button>
+          </div>
+        )}
       </div>
     );
   }

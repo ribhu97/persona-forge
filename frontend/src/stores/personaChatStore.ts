@@ -10,6 +10,7 @@ interface PersonaChatStore {
   setActivePersona: (personaId: number) => void;
   loadSession: (personaId: number) => Promise<void>;
   sendMessage: (personaId: number, content: string) => Promise<void>;
+  retryMessage: (personaId: number, failedMessageId: number, content: string) => Promise<void>;
   clearSession: (personaId: number) => Promise<void>;
   setFeedback: (personaId: number, messageId: number, value: 'up' | 'down' | null) => Promise<void>;
   toggleTag: (personaId: number, messageId: number, tag: TagType) => Promise<void>;
@@ -130,7 +131,7 @@ export const usePersonaChatStore = create<PersonaChatStore>((set, get) => ({
             ...s.sessions,
             [personaId]: {
               ...cur,
-              messages: cur.messages.filter(m => m.id !== tempId),
+              messages: cur.messages.map(m => m.id === tempId ? { ...m, failed: true } : m),
               isLoading: false,
               error: appError.message,
               errorType: appError.type,
@@ -139,6 +140,24 @@ export const usePersonaChatStore = create<PersonaChatStore>((set, get) => ({
         };
       });
     }
+  },
+
+  retryMessage: async (personaId, failedMessageId, content) => {
+    set(s => {
+      const cur = getOrInit(s.sessions, personaId);
+      return {
+        sessions: {
+          ...s.sessions,
+          [personaId]: {
+            ...cur,
+            messages: cur.messages.filter(m => m.id !== failedMessageId),
+            error: null,
+            errorType: null,
+          },
+        },
+      };
+    });
+    await get().sendMessage(personaId, content);
   },
 
   clearSession: async (personaId) => {
