@@ -288,7 +288,7 @@ class PersonaChatMessageResponse(BaseModel):
 
 class PersonaChatFeedbackRequest(BaseModel):
     message_id: int
-    rating: Literal["up", "down"]
+    rating: Optional[Literal["up", "down"]]
 
 
 class PersonaChatTagsRequest(BaseModel):

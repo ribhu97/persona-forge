@@ -112,14 +112,14 @@ async def send_persona_chat_message(
 
     chat_session = _find_or_create_session(user.id, persona_id, session)
 
-    # Load last 20 messages as history
+    # Load the 20 most-recent messages, then reverse to chronological order
     stmt = (
         select(PersonaChatMessage)
         .where(PersonaChatMessage.session_id == chat_session.id)
-        .order_by(PersonaChatMessage.created_at.asc())
+        .order_by(PersonaChatMessage.created_at.desc())
         .limit(20)
     )
-    history_rows = session.exec(stmt).all()
+    history_rows = list(reversed(session.exec(stmt).all()))
     message_history = [{"role": m.role, "content": m.content} for m in history_rows]
 
     persona_profile = _load_persona_profile(persona)
@@ -228,7 +228,7 @@ async def set_persona_chat_feedback(
     if not chat_session or chat_session.user_id != user.id or chat_session.persona_id != persona_id:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    msg.feedback = data.rating
+    msg.feedback = data.rating  # None clears the rating
     session.add(msg)
     session.commit()
     return {"success": True}

@@ -168,26 +168,24 @@ export const usePersonaChatStore = create<PersonaChatStore>((set, get) => ({
       };
     });
 
-    if (value) {
-      try {
-        await personaChatAPI.sendFeedback(personaId, messageId, value);
-      } catch {
-        // Rollback on failure
-        set(s => {
-          const cur = getOrInit(s.sessions, personaId);
-          return {
-            sessions: {
-              ...s.sessions,
-              [personaId]: {
-                ...cur,
-                messages: cur.messages.map(m =>
-                  m.id === messageId ? { ...m, feedback: undefined } : m
-                ),
-              },
+    try {
+      await personaChatAPI.sendFeedback(personaId, messageId, value);
+    } catch {
+      // Rollback on failure
+      set(s => {
+        const cur = getOrInit(s.sessions, personaId);
+        return {
+          sessions: {
+            ...s.sessions,
+            [personaId]: {
+              ...cur,
+              messages: cur.messages.map(m =>
+                m.id === messageId ? { ...m, feedback: undefined } : m
+              ),
             },
-          };
-        });
-      }
+          },
+        };
+      });
     }
   },
 

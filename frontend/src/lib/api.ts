@@ -257,7 +257,7 @@ export const personaChatAPI = {
     return response.data;
   },
 
-  sendFeedback: async (personaId: number, messageId: number, rating: 'up' | 'down') => {
+  sendFeedback: async (personaId: number, messageId: number, rating: 'up' | 'down' | null) => {
     await apiClient.post(`/persona-chat/${personaId}/feedback`, { message_id: messageId, rating });
   },
 
