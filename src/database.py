@@ -27,6 +27,10 @@ if sqlite_url.startswith("sqlite"):
             cur.execute("PRAGMA busy_timeout=10000")  # 10 s queue before raising OperationalError
         except Exception as e:
             logger.warning("Failed to set busy_timeout: %s", e)
+        try:
+            cur.execute("PRAGMA foreign_keys=ON")
+        except Exception as e:
+            logger.warning("Failed to enable foreign keys: %s", e)
         cur.close()
 
 def create_db_and_tables():

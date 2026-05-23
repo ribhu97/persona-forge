@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { InlineEditor, ArrayEditor } from './InlineEditor';
@@ -44,8 +45,12 @@ export function PersonaCard({
   // Debug log
   // console.log('PersonaCard render:', persona.id, 'goals:', persona.goals);
 
+  const navigate = useNavigate();
   const [showActions, setShowActions] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const hasRealId = typeof persona.id === 'number' ||
+    (typeof persona.id === 'string' && /^\d+$/.test(persona.id));
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -143,6 +148,16 @@ export function PersonaCard({
               )}>
                 {persona.status}
               </span>
+              {hasRealId && !isCollapsed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/chat/${persona.id}`); }}
+                  className="h-7 px-3 text-[11px] font-mono tracking-[0.15em] uppercase border-foreground/20 hover:bg-foreground hover:text-background"
+                >
+                  ▸ CHAT_WITH
+                </Button>
+              )}
             </div>
             {!isCollapsed && (
               <InlineEditor

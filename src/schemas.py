@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+import json
 
 # Auth Schemas
 class UserCreate(BaseModel):
@@ -215,4 +216,81 @@ class BlogListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# --- Persona Chat Schemas ---
+
+PERSONA_CHAT_MOODS = [
+    "deadpan", "thoughtful", "neutral", "matter-of-fact",
+    "frustrated", "skeptical", "blunt", "dry",
+    "curious", "driven", "enthused",
+]
+
+PERSONA_CHAT_TRAIT_SOURCE_TYPES = ["DEMOGRAPHICS", "SCENARIO_CONTEXT"]
+
+
+class PersonaChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+
+
+class TraitAttribution(BaseModel):
+    source_type: str
+    text: str
+    source_index: int = 0
+
+
+class PersonaChatResponse(BaseModel):
+    message_id: int
+    content: str
+    mood: str
+    trait: Optional[TraitAttribution] = None
+
+
+class PersonaChatMessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    mood: Optional[str] = None
+    trait: Optional[TraitAttribution] = None
+    feedback: Optional[str] = None
+    tags: List[str] = []
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_fields(cls, data):
+        if hasattr(data, '__dict__'):
+            d = {k: v for k, v in data.__dict__.items() if not k.startswith('_')}
+        else:
+            d = dict(data)
+
+        src_type = d.pop('trait_source_type', None)
+        txt = d.pop('trait_text', None)
+        src_idx = d.pop('trait_source_index', None)
+        if src_type and txt:
+            d['trait'] = {'source_type': src_type, 'text': txt, 'source_index': src_idx or 0}
+        else:
+            d['trait'] = None
+
+        raw_tags = d.get('tags')
+        if isinstance(raw_tags, str):
+            try:
+                d['tags'] = json.loads(raw_tags)
+            except (json.JSONDecodeError, TypeError):
+                d['tags'] = []
+        elif raw_tags is None:
+            d['tags'] = []
+
+        return d
+
+
+class PersonaChatFeedbackRequest(BaseModel):
+    message_id: int
+    rating: Optional[Literal["up", "down"]]
+
+
+class PersonaChatTagsRequest(BaseModel):
+    tags: List[Literal["insight", "friction", "quote"]]
 

@@ -151,7 +151,12 @@ export const personaAPI = {
   updatePersona: async (personaId: string | number, updates: Partial<Persona>): Promise<BackendPersona> => {
     const response = await apiClient.put<BackendPersona>(`/personas/${personaId}`, updates);
     return response.data;
-  }
+  },
+
+  getPersona: async (personaId: number): Promise<BackendPersona> => {
+    const response = await apiClient.get<BackendPersona>(`/personas/${personaId}`);
+    return response.data;
+  },
 };
 
 export const chatAPI = {
@@ -240,6 +245,31 @@ export interface BlogListResponse {
   page_size: number;
   total_pages: number;
 }
+
+export const personaChatAPI = {
+  sendMessage: async (personaId: number, message: string) => {
+    const response = await apiClient.post(`/persona-chat/${personaId}/send`, { message });
+    return response.data;
+  },
+
+  getMessages: async (personaId: number) => {
+    const response = await apiClient.get(`/persona-chat/${personaId}/messages`);
+    return response.data;
+  },
+
+  sendFeedback: async (personaId: number, messageId: number, rating: 'up' | 'down' | null) => {
+    await apiClient.post(`/persona-chat/${personaId}/feedback`, { message_id: messageId, rating });
+  },
+
+  setTags: async (personaId: number, messageId: number, tags: string[]) => {
+    const response = await apiClient.post(`/persona-chat/${personaId}/message/${messageId}/tags`, { tags });
+    return response.data;
+  },
+
+  clearSession: async (personaId: number) => {
+    await apiClient.delete(`/persona-chat/${personaId}/session`);
+  },
+};
 
 export const blogAPI = {
   list: async (page = 1, pageSize = 10): Promise<BlogListResponse> => {
