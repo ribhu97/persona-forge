@@ -103,6 +103,14 @@ def create_db_and_tables():
             cursor.execute("ALTER TABLE messages ADD COLUMN attachment_char_count INTEGER")
             print("Successfully added attachment_char_count column to messages table")
 
+        # one_time_passwords table migrations
+        cursor.execute("PRAGMA table_info(one_time_passwords)")
+        otp_columns = [col[1] for col in cursor.fetchall()]
+
+        if otp_columns and 'attempts' not in otp_columns:
+            cursor.execute("ALTER TABLE one_time_passwords ADD COLUMN attempts INTEGER DEFAULT 0")
+            logger.info("Added attempts column to one_time_passwords table")
+
         # payments table migrations
         cursor.execute("PRAGMA table_info(payments)")
         payment_columns = [col[1] for col in cursor.fetchall()]

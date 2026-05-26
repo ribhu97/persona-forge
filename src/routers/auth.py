@@ -1,22 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlmodel import Session, select
+from sqlalchemy import update
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
 
 from src.database import get_session
-from src.models import User, OneTimePassword
+from src.models import User, OneTimePassword, OTP_MAX_ATTEMPTS
 from src.schemas import UserCreate, UserLogin, OTPVerify, GoogleLogin, Token, UserResponse
 from src.auth import (
-    get_password_hash, verify_password, create_access_token, 
+    get_password_hash, verify_password, create_access_token,
     generate_otp, verify_google_token, ACCESS_TOKEN_EXPIRE_MINUTES,
     get_current_user
 )
 from src.email_service import send_otp_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/signup", response_model=dict)
-async def signup(user_in: UserCreate, session: Annotated[Session, Depends(get_session)]):
+@limiter.limit("5/minute")
+async def signup(request: Request, user_in: UserCreate, session: Annotated[Session, Depends(get_session)]):
     # Check if user exists
     existing_user = session.exec(select(User).where(User.email == user_in.email)).first()
     if existing_user:
@@ -57,35 +62,65 @@ async def signup(user_in: UserCreate, session: Annotated[Session, Depends(get_se
     return {"message": "User created. Please verify your email with the OTP sent."}
 
 @router.post("/verify-otp", response_model=Token)
-async def verify_otp(data: OTPVerify, session: Annotated[Session, Depends(get_session)]):
+@limiter.limit("10/minute")
+async def verify_otp(request: Request, data: OTPVerify, session: Annotated[Session, Depends(get_session)]):
     user = session.exec(select(User).where(User.email == data.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    # Find valid OTP
+
+    # Find the most recent non-expired OTP for this user (don't check code yet)
     otp = session.exec(
         select(OneTimePassword)
         .where(OneTimePassword.user_id == user.id)
-        .where(OneTimePassword.code == data.otp)
         .where(OneTimePassword.expires_at > datetime.now(timezone.utc))
+        .order_by(OneTimePassword.created_at.desc())
     ).first()
-    
+
     if not otp:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-        
-    # Mark verified
+
+    # Atomically claim one attempt slot BEFORE comparing the code. The
+    # `attempts < OTP_MAX_ATTEMPTS` guard lives inside a single UPDATE, so
+    # concurrent submissions cannot all read the same counter and overspend it:
+    # the DB serializes the writes and at most OTP_MAX_ATTEMPTS requests can ever
+    # win the slot, capping the number of code comparisons for a live code.
+    result = session.execute(
+        update(OneTimePassword)
+        .where(OneTimePassword.id == otp.id)
+        .where(OneTimePassword.attempts < OTP_MAX_ATTEMPTS)
+        .values(attempts=OneTimePassword.attempts + 1)
+    )
+    session.commit()
+
+    if result.rowcount == 0:
+        # No slot left — the limit is already reached. Burn the code so it
+        # can't be retried, then reject.
+        session.delete(otp)
+        session.commit()
+        raise HTTPException(status_code=429, detail="Too many incorrect attempts. Please request a new OTP.")
+
+    # Reload the freshly-incremented counter for an accurate "remaining" message.
+    session.refresh(otp)
+
+    if otp.code != data.otp:
+        remaining = OTP_MAX_ATTEMPTS - otp.attempts
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid OTP. {remaining} attempt{'s' if remaining != 1 else ''} remaining."
+        )
+
+    # Code correct — mark verified and consume OTP
     user.is_verified = True
     session.add(user)
-    # Delete used OTP
     session.delete(otp)
     session.commit()
-    
-    # Generate Token
+
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
-async def login(data: UserLogin, session: Annotated[Session, Depends(get_session)]):
+@limiter.limit("10/minute")
+async def login(request: Request, data: UserLogin, session: Annotated[Session, Depends(get_session)]):
     user = session.exec(select(User).where(User.email == data.email)).first()
     if not user or not user.hashed_password or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -97,7 +132,8 @@ async def login(data: UserLogin, session: Annotated[Session, Depends(get_session
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/google", response_model=Token)
-async def google_login(data: GoogleLogin, session: Annotated[Session, Depends(get_session)]):
+@limiter.limit("10/minute")
+async def google_login(request: Request, data: GoogleLogin, session: Annotated[Session, Depends(get_session)]):
     id_info = verify_google_token(data.token)
     if not id_info:
         raise HTTPException(status_code=400, detail="Invalid Google token")

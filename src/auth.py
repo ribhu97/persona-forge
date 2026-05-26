@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import httpx
-import random
+import secrets
 import string
 from dotenv import load_dotenv
 
@@ -47,7 +47,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 def generate_otp() -> str:
-    return "".join(random.choices(string.digits, k=6))
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 def verify_google_token(token: str) -> Optional[dict]:
     try:

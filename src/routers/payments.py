@@ -111,10 +111,12 @@ async def verify_payment(
         client.utility.verify_payment_signature(params_dict)
         
         # Update payment status
-        statement = select(Payment).where(Payment.razorpay_order_id == verify_data.razorpay_order_id)
-        results = session.exec(statement)
-        payment = results.first()
-        
+        statement = select(Payment).where(
+            Payment.razorpay_order_id == verify_data.razorpay_order_id,
+            Payment.user_id == current_user.id,
+        )
+        payment = session.exec(statement).first()
+
         if not payment:
             raise HTTPException(status_code=404, detail="Order not found")
 
