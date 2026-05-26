@@ -37,12 +37,15 @@ class Payment(SQLModel, table=True):
     
     user: User = Relationship(back_populates="payments")
 
+OTP_MAX_ATTEMPTS = 5
+
 class OneTimePassword(SQLModel, table=True):
     __tablename__ = "one_time_passwords"
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
     code: str
     expires_at: datetime
+    attempts: int = Field(default=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     user: User = Relationship(back_populates="otps")
