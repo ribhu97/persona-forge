@@ -75,9 +75,17 @@ profile_default/
 # Database
 data/*
 database.db
+database.db-shm
+database.db-wal
 
 # Build-time generated content (refresh via npm run prefetch before building)
 frontend/.generated/
 
 # uv related
 uv.lock
+
+# Agent helpers
+.dual-graph/
+.token-savior-cache.json
+.claude/
+graphify-out/
