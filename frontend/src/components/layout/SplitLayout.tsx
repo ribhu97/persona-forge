@@ -18,13 +18,14 @@ export function SplitLayout({
   minRightWidth = 400,
   className
 }: SplitLayoutProps) {
-  const [ratio, setRatio] = useState(() => {
-    if (typeof localStorage === 'undefined') return defaultRatio;
-    const saved = localStorage.getItem('split-layout-ratio');
-    return saved ? parseFloat(saved) : defaultRatio;
-  });
+  const [ratio, setRatio] = useState(defaultRatio);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('split-layout-ratio');
+    if (saved) setRatio(parseFloat(saved));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('split-layout-ratio', ratio.toString());

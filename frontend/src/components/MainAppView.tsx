@@ -185,12 +185,12 @@ export function MainAppView() {
 
   const leftPanel = isInitialState ? (
     <div className="h-full w-full bg-background relative flex flex-col">
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-6">
         <Link to="/blog">
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground font-medium"
+            className="terminal-prompt text-muted-foreground hover:text-foreground font-medium"
           >
             Blog
           </Button>
@@ -199,7 +199,7 @@ export function MainAppView() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground font-medium"
+            className="terminal-prompt text-muted-foreground hover:text-foreground font-medium"
           >
             Pricing
           </Button>
@@ -271,14 +271,14 @@ export function MainAppView() {
   return (
     <div className="h-screen w-screen overflow-hidden relative">
       <ErrorBoundary>
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-6">
           {!isInitialState && (
             <>
               <Link to="/blog">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
+                  className="terminal-prompt text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
                 >
                   Blog
                 </Button>
@@ -287,7 +287,7 @@ export function MainAppView() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
+                  className="terminal-prompt text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
                 >
                   Pricing
                 </Button>
@@ -307,8 +307,13 @@ export function MainAppView() {
           </div>
         )}
 
+        {/* Mobile experience banner */}
+        <div className="md:hidden absolute top-0 left-0 right-0 z-[60] bg-yellow-50 border-b border-yellow-200 text-yellow-900 text-xs text-center px-4 py-2 font-medium">
+          For the best experience, please use PersonaForge on a desktop.
+        </div>
+
         <ResponsiveLayout
-          sidebar={<Sidebar />}
+          sidebar={<Sidebar onLoginClick={onLogin} />}
           leftPanel={leftPanel}
           rightPanel={rightPanel}
           rightPanelLabel="Personas"

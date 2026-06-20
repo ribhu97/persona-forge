@@ -116,6 +116,44 @@ h6,
   font-family: 'Share Tech Mono', monospace;
 }
 
+/* Shell-prompt hover: ">" slides in from the left and the element shifts right ~12px. */
+.terminal-prompt {
+  position: relative;
+  transition: transform 200ms ease-out;
+}
+.terminal-prompt::before {
+  content: '>';
+  position: absolute;
+  right: 100%;
+  margin-right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  font-family: 'Space Mono', monospace;
+  pointer-events: none;
+}
+.terminal-prompt:hover {
+  transform: translateX(0.75rem);
+}
+.terminal-prompt:hover::before,
+.terminal-prompt:focus-visible::before {
+  opacity: 1;
+}
+.terminal-prompt:focus-visible {
+  transform: translateX(0.75rem);
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-prompt,
+  .terminal-prompt::before {
+    transition: none;
+  }
+  .terminal-prompt:hover,
+  .terminal-prompt:focus-visible {
+    transform: none;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

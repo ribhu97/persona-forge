@@ -22,7 +22,12 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
 
     if (!isAuthenticated) {
         return (
-            <Button variant="outline" onClick={onLoginClick}>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLoginClick}
+                className="terminal-prompt text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
                 Sign In
             </Button>
         );
