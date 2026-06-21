@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { GenerationMode, ProcessedFile } from '@/types';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, ChevronDown, Settings2 } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown } from 'lucide-react';
 import { FileUpload } from '@/components/chat/FileUpload';
 import { ACCEPTED_TYPES, useFileUpload } from '@/hooks/useFileUpload';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+const MAX_CHARS = 8000;
 
 interface SearchData {
   text: string;
@@ -89,7 +92,7 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
     if (!input.trim() || isLoading) return;
 
     await onSubmit({
-      text: input.trim(),
+      text: input.trim().slice(0, MAX_CHARS),
       mode,
       files,
       fileId: attachedFileId ?? undefined,
@@ -106,10 +109,13 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
       className
     )}>
       {/* Header */}
-      <div className="text-center space-y-6 transition-all duration-500 ease-out">
+      <div className="text-center space-y-4 transition-all duration-500 ease-out">
         <h1 className="text-6xl tracking-tight text-foreground transition-all duration-500 pb-2 ease-out font-display">
           PERSONA FORGE
         </h1>
+        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-mono">
+          a Pehloo tool
+        </p>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed transition-all duration-500 ease-out">
           Describe your product or service to generate detailed user personas powered by AI
         </p>
@@ -120,10 +126,11 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
         <div className="relative">
           <div
             {...getRootProps()}
+            style={{ backgroundColor: 'hsl(var(--background))' }}
             className={cn(
-              "relative bg-background border-2 border-border p-6 transition-all duration-300 ease-out",
-              "hover:border-black dark:hover:border-white focus-within:border-primary",
-              isDragActive && "border-dashed border-primary bg-primary/5",
+              "relative border-2 border-foreground/80 shadow-[4px_4px_0_0_hsl(var(--foreground))] p-6 transition-all duration-300 ease-out",
+              "focus-within:border-primary",
+              isDragActive && "border-dashed border-primary",
             )}
           >
             <input {...getInputProps()} />
@@ -144,131 +151,133 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              maxLength={MAX_CHARS}
               placeholder="Describe your product, service, or concept in detail. Include target market, key features, and business goals for the most accurate personas..."
               className={cn(
                 "min-h-[120px] text-lg leading-relaxed resize-none border-0 p-0 shadow-none transition-all duration-300 ease-out font-medium",
                 "focus:ring-0 focus:border-0 bg-transparent outline-none focus:bg-muted/20",
                 "placeholder:text-muted-foreground placeholder:font-normal",
-                "focus-visible:outline-none focus-visible:ring-0"
+                "focus-visible:outline-none focus-visible:ring-0",
+                "caret-[hsl(var(--foreground))] [caret-shape:block]"
               )}
               disabled={isLoading}
             />
 
             {/* Bottom Controls Bar */}
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border transition-all duration-300 ease-out">
-              {/* Left Side Controls */}
-              <div className="flex items-center gap-3">
-                {/* File Upload — click-to-browse; drag handled by the outer search box */}
-                <FileUpload
-                  onFileReady={(fileId) => setAttachedFileId(fileId)}
-                  onFileRemoved={() => setAttachedFileId(null)}
-                  disabled={isLoading}
-                  externalState={fileState}
-                  externalHandleRemove={handleFileRemoved}
-                />
-
-                {/* Settings Button */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0 hover:bg-muted/60 transition-all duration-200 ease-out rounded-lg"
-                  disabled={true}
-                  title="Fine-grained controls coming soon"
-                >
-                  <Settings2 className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </div>
-
-              {/* Right Side Controls */}
-              <div className="flex items-center gap-3">
-                {/* Mode Selector Dropdown */}
-                <div className="relative" ref={dropdownRef}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowModeDropdown(!showModeDropdown)}
-                    className="h-9 px-4 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-out"
-                  >
-                    <span className="mr-2">{selectedMode.icon}</span>
-                    {selectedMode.label}
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-
-                  {/* Dropdown Menu */}
-                  {showModeDropdown && (
-                    <div className="absolute top-full left-0 mt-3 w-52 bg-background border border-border z-50 animate-in fade-in slide-in-from-top-2 duration-200 ease-out backdrop-blur-sm">
-                      {Object.entries(GENERATION_MODES).map(([key, modeOption]) => {
-                        const isSelected = key === mode;
-                        const isDisabled = modeOption.disabled;
-
-                        return (
-                          <button
-                            key={key}
-                            onClick={() => {
-                              if (!isDisabled) {
-                                setMode(key as GenerationMode);
-                                setShowModeDropdown(false);
-                              }
-                            }}
-                            disabled={isDisabled}
-                            className={cn(
-                              "w-full px-4 py-3 text-left text-sm font-medium hover:bg-muted transition-all duration-200 ease-out mx-2 my-1",
-                              "flex items-center gap-3",
-                              isSelected && "bg-primary/10 text-primary",
-                              isDisabled && "opacity-50 cursor-not-allowed",
-                              "bg-background"
-                            )}
-                          >
-                            <span className="text-lg">{modeOption.icon}</span>
-                            <span>{modeOption.label}</span>
-                            {modeOption.disabled && (
-                              <span className="ml-auto text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full font-medium">
-                                Soon
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border transition-all duration-300 ease-out">
+                {/* Left Side Controls */}
+                <div className="flex items-center gap-3">
+                  {/* File Upload — click-to-browse; drag handled by the outer search box */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span aria-label="Attach file">
+                        <FileUpload
+                          onFileReady={(fileId) => setAttachedFileId(fileId)}
+                          onFileRemoved={() => setAttachedFileId(null)}
+                          disabled={isLoading}
+                          externalState={fileState}
+                          externalHandleRemove={handleFileRemoved}
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Attach file (PDF, image, markdown)
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
-                {/* Generate Button */}
-                <Button
-                  type="submit"
-                  disabled={!hasContent || isLoading}
-                  size="sm"
-                  className={cn(
-                    "h-9 px-6 font-semibold transition-all duration-200 ease-out",
-                    hasContent && !isLoading
-                      ? "bg-primary hover:bg-primary/80 text-primary-foreground"
-                      : "bg-primary/60 hover:bg-primary/70 text-primary-foreground"
-                  )}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className={cn(
-                      "h-4 w-4",
-                      hasContent && !isLoading ? "text-white" : ""
-                    )} />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
+                {/* Right Side Controls */}
+                <div className="flex items-center gap-3">
+                  {/* Character Count */}
+                  <span
+                    aria-live="polite"
+                    className={cn(
+                      "text-xs font-mono text-muted-foreground transition-colors duration-200",
+                      characterCount > 7000 && "text-yellow-600",
+                      characterCount > 7800 && "text-red-600",
+                    )}
+                  >
+                    {characterCount} / {MAX_CHARS}
+                  </span>
 
-          {/* Character Count */}
-          <div className="absolute top-6 right-6">
-            <span className={cn(
-              "text-sm font-medium transition-all duration-200 ease-out",
-              characterCount > 500 && "text-yellow-600",
-              characterCount > 1000 && "text-red-600"
-            )}>
-              {characterCount}
-            </span>
+                  {/* Mode Selector Dropdown */}
+                  <div className="relative" ref={dropdownRef}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowModeDropdown(!showModeDropdown)}
+                      className="terminal-prompt h-9 px-4 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 ease-out"
+                    >
+                      <span className="mr-2">{selectedMode.icon}</span>
+                      {selectedMode.label}
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+
+                    {/* Dropdown Menu */}
+                    {showModeDropdown && (
+                      <div className="absolute top-full left-0 mt-3 w-52 bg-background border border-border z-50 animate-in fade-in slide-in-from-top-2 duration-200 ease-out backdrop-blur-sm">
+                        {Object.entries(GENERATION_MODES).map(([key, modeOption]) => {
+                          const isSelected = key === mode;
+                          const isDisabled = modeOption.disabled;
+
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => {
+                                if (!isDisabled) {
+                                  setMode(key as GenerationMode);
+                                  setShowModeDropdown(false);
+                                }
+                              }}
+                              disabled={isDisabled}
+                              className={cn(
+                                "w-full px-4 py-3 text-left text-sm font-medium hover:bg-muted transition-all duration-200 ease-out mx-2 my-1",
+                                "flex items-center gap-3",
+                                isSelected && "bg-primary/10 text-primary",
+                                isDisabled && "opacity-50 cursor-not-allowed",
+                                "bg-background"
+                              )}
+                            >
+                              <span className="text-lg">{modeOption.icon}</span>
+                              <span>{modeOption.label}</span>
+                              {modeOption.disabled && (
+                                <span className="ml-auto text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full font-medium">
+                                  Soon
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Generate Button */}
+                  <Button
+                    type="submit"
+                    disabled={!hasContent || isLoading}
+                    aria-label="Generate personas"
+                    className={cn(
+                      "group h-10 px-5 font-semibold inline-flex items-center transition-all duration-200 ease-out",
+                      hasContent && !isLoading
+                        ? "bg-primary hover:bg-primary/80 text-primary-foreground"
+                        : "bg-primary/60 hover:bg-primary/70 text-primary-foreground"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <span className="hidden sm:inline">Generate</span>
+                        <ArrowRight className="h-4 w-4 sm:ml-2 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </TooltipProvider>
           </div>
         </div>
       </form>
@@ -285,11 +294,21 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
           ].map((example) => (
             <button
               key={example}
+              type="button"
               onClick={() => setInput(example)}
               disabled={isLoading}
-              className="text-sm px-4 py-2 bg-secondary hover:bg-secondary/80 transition-all duration-200 ease-out font-mono font-bold tracking-[0.1em] uppercase"
+              className={cn(
+                "terminal-prompt group",
+                "text-sm px-4 py-2 border border-border rounded-full",
+                "bg-background hover:bg-secondary hover:border-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "transition-all duration-200 font-mono font-medium tracking-wide",
+                "inline-flex items-center gap-2",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              )}
             >
               {example}
+              <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none" />
             </button>
           ))}
         </div>

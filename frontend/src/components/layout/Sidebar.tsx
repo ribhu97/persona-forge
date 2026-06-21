@@ -10,9 +10,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface SidebarProps {
     className?: string;
+    onLoginClick?: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onLoginClick }: SidebarProps) {
     const {
         conversations,
         currentConversationId,
@@ -78,7 +79,7 @@ export function Sidebar({ className }: SidebarProps) {
             </div>
 
             {/* New Chat Button */}
-            {!isCollapsed && (
+            {!isCollapsed && isAuthenticated && (
                 <div className="px-4 pb-2">
                     <Button
                         onClick={handleNewChat}
@@ -88,6 +89,21 @@ export function Sidebar({ className }: SidebarProps) {
                         <Plus className="w-4 h-4" />
                         New Chat
                     </Button>
+                </div>
+            )}
+
+            {/* Signed-out prompt */}
+            {!isAuthenticated && !isCollapsed && (
+                <div className="px-4 py-6 text-sm text-muted-foreground space-y-3 border-b border-border">
+                    <p>Sign in to see your previously generated personas.</p>
+                    {onLoginClick && (
+                        <button
+                            onClick={onLoginClick}
+                            className="text-foreground font-medium underline underline-offset-4 hover:no-underline"
+                        >
+                            Sign in →
+                        </button>
+                    )}
                 </div>
             )}
 
