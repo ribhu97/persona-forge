@@ -313,6 +313,31 @@ export function SearchInterface({ onSubmit, isLoading, className }: SearchInterf
           ))}
         </div>
       </div>
+
+      {/* Featured-on badges */}
+      <div className="flex flex-wrap justify-center items-center gap-6 pt-2 pb-6 transition-all duration-500 ease-out">
+        <a href="https://tinylaunch.com" target="_blank" rel="noopener">
+          <img
+            src="https://tinylaunch.com/tinylaunch_badge_featured_on.svg"
+            alt="TinyLaunch Badge"
+            style={{ width: 202, height: 'auto' }}
+          />
+        </a>
+        <a href="https://peerpush.com/p/personaforge" target="_blank" rel="noopener">
+          <img
+            src="https://peerpush.com/p/personaforge/badge.png"
+            alt="Pehloo PersonaForge on PeerPush"
+            style={{ width: 230, height: 'auto' }}
+          />
+        </a>
+        <a href="https://fazier.com/launches/personaforge.pehloo.xyz" target="_blank" rel="noopener">
+          <img
+            src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=neutral"
+            alt="Fazier badge"
+            style={{ width: 120, height: 'auto' }}
+          />
+        </a>
+      </div>
     </div>
   );
 }
