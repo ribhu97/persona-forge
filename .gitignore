@@ -89,3 +89,4 @@ uv.lock
 .token-savior-cache.json
 .claude/
 graphify-out/
+.dual-graph-context/

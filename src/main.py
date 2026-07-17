@@ -24,6 +24,7 @@ from src.routers.payments import router as payments_router
 from src.routers.personas import router as personas_router
 from src.routers.blog import router as blog_router
 from src.routers.persona_chat import router as persona_chat_router
+from src.routers.jobs import router as jobs_router
 import uvicorn
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,74 @@ async def lifespan(app: FastAPI):
         session.close()
     except Exception as e:
         logger.warning("Startup file sweep failed (non-fatal): %s", e)
+
+    # ── Job worker ──
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from src import jobs as jobs_mod
+    from src.think_hard import run_job
+
+    worker_stop = threading.Event()
+    worker_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="job-worker")
+
+    def _job_done_callback(future, job_id):
+        """Force-fail the job if the future raised an unhandled exception."""
+        try:
+            future.result()
+        except Exception as e:
+            logger.error("[worker] job %s raised unhandled: %s", job_id, e, exc_info=True)
+            job = jobs_mod.get_job(job_id)
+            if job and job.state in jobs_mod.NON_TERMINAL_STATES:
+                jobs_mod.fail_job(
+                    job_id, jobs_mod.ERR_INTERNAL_ERROR,
+                    error_detail=str(e),
+                    reservation_id=job.reservation_id if job else None,
+                )
+
+    def _worker_loop():
+        import time
+        sweep_interval = 60.0
+        last_sweep = time.time()
+        worker_id = f"worker-{os.getpid()}"
+
+        while not worker_stop.is_set():
+            try:
+                job = jobs_mod.claim_next_queued(worker_id)
+                if job:
+                    future = worker_pool.submit(run_job, job.id)
+                    future.add_done_callback(lambda f, jid=job.id: _job_done_callback(f, jid))
+                else:
+                    # No job available — brief sleep
+                    if worker_stop.wait(0.5):
+                        break
+
+                # Run sweepers periodically
+                now = time.time()
+                if now - last_sweep >= sweep_interval:
+                    last_sweep = now
+                    try:
+                        from src.database import get_session as _gs
+                        sweep_session = next(_gs())
+                        jobs_mod.run_all_sweeps(sweep_session)
+                        sweep_session.close()
+                    except Exception as se:
+                        logger.warning("[worker] sweep failed (non-fatal): %s", se)
+            except Exception as e:
+                logger.error("[worker] loop error: %s", e, exc_info=True)
+                if worker_stop.wait(1.0):
+                    break
+
+    worker_thread = threading.Thread(target=_worker_loop, daemon=True, name="job-worker-loop")
+    worker_thread.start()
+    logger.info("Job worker started (worker_id=%s, max_workers=4)", f"worker-{os.getpid()}")
+
     yield
+
+    # ── Shutdown ──
+    worker_stop.set()
+    worker_pool.shutdown(wait=False, cancel_futures=True)
+    logger.info("Job worker shutting down...")
+    worker_thread.join(timeout=5)
 
 app = FastAPI(
     title="User Persona Generator API",
@@ -107,6 +175,7 @@ app.include_router(payments_router, prefix="/api")
 app.include_router(personas_router, prefix="/api")
 app.include_router(blog_router, prefix="/api")
 app.include_router(persona_chat_router, prefix="/api")
+app.include_router(jobs_router, prefix="/api")
 
 @app.get("/")
 async def root():

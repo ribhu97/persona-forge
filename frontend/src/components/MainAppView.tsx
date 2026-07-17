@@ -3,15 +3,16 @@ import { PersonaPanel } from '@/components/persona/PersonaPanel';
 import { ResponsiveLayout } from '@/components/layout/SplitLayout';
 import { usePersonaStore } from '@/stores/personaStore';
 import { useAuthStore } from '@/stores/authStore';
-import type { Persona, BackendPersona, PersonaVersion } from '@/types';
+import type { Persona, BackendPersona, PersonaVersion, ThinkHardProgress } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { UserStatus } from '@/components/auth/UserStatus';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { personaAPI } from '@/lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { personaAPI, jobsAPI } from '@/lib/api';
 import { useAppContext } from '@/App';
+import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProgress';
 
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -32,6 +33,7 @@ export function MainAppView() {
   const {
     createConversation,
     sendMessage,
+    selectConversation,
     messages,
     currentConversationId,
     isLoading: isChatLoading,
@@ -39,6 +41,7 @@ export function MainAppView() {
   } = useChatStore();
 
   const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowSplit, setShouldShowSplit] = useState(false);
@@ -46,6 +49,15 @@ export function MainAppView() {
   const [personaVersions, setPersonaVersions] = useState<PersonaVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const prevMessagesLength = useRef(0);
+
+  // Think Hard job state
+  const [thinkHardProgress, setThinkHardProgress] = useState<ThinkHardProgress | null>(null);
+  const sseClientRef = useRef<{ close: () => void } | null>(null);
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => { sseClientRef.current?.close(); };
+  }, []);
 
   // Sync chat personas to persona store and handle versioning
   useEffect(() => {
@@ -165,10 +177,68 @@ export function MainAppView() {
     }
 
     try {
-      await createConversation(data.text);
-      await sendMessage(data.text, data.fileId);
+      const conv = await createConversation(data.text);
+
+      if (data.mode === 'think_hard') {
+        // ── Think Hard: create a job and stream events ──
+        setThinkHardProgress({ stage: 'queued', message: 'Creating job...', isTerminal: false });
+        setShouldShowSplit(true);
+
+        try {
+          const job = await jobsAPI.createJob(conv.id, {
+            text: data.text,
+            mode: 'think_hard',
+            file_id: data.fileId,
+          });
+
+          // Fetch messages to get the pending assistant message
+          await selectConversation(conv.id);
+
+          // Subscribe to SSE events
+          sseClientRef.current?.close();
+          const sseClient = jobsAPI.streamJobEvents(conv.id, job.id, {
+            onEvent: (event) => {
+              if (event.event && event.data) {
+                const progress = parseJobEvent(event.event, event.data);
+                setThinkHardProgress(progress);
+
+                if (progress.isTerminal) {
+                  // On terminal, fetch messages to get the final personas
+                  setTimeout(() => {
+                    selectConversation(conv.id);
+                    setThinkHardProgress(null);
+                  }, 500);
+                  sseClientRef.current?.close();
+                }
+              }
+            },
+            onError: (err) => {
+              console.error('SSE error:', err);
+              setThinkHardProgress({
+                stage: 'failed',
+                message: 'Connection lost. Please refresh.',
+                isTerminal: true,
+                error: err.message,
+              });
+            },
+          });
+          sseClientRef.current = sseClient;
+        } catch (err: any) {
+          const status = err.response?.status;
+          if (status === 402) {
+            setThinkHardProgress(null);
+            navigate('/pricing');
+            return;
+          }
+          throw err;
+        }
+      } else {
+        // ── Quick mode: existing synchronous flow ──
+        await sendMessage(data.text, data.fileId);
+      }
     } catch (err: any) {
       console.error('Failed to generate personas:', err);
+      setThinkHardProgress(null);
     }
   };
 
@@ -252,18 +322,26 @@ export function MainAppView() {
           ? "opacity-0 translate-x-4 transform"
           : "opacity-100 translate-x-0"
       )}>
-        <PersonaPanel
-          personas={personas}
-          onUpdatePersona={handleUpdatePersona}
-          onDeletePersona={deletePersona}
-          onDuplicatePersona={handleDuplicatePersona}
-          onClearAll={handleClearAll}
-          isLoading={isChatLoading}
-          isTransitioning={isTransitioning}
-          versions={personaVersions}
-          selectedVersionId={selectedVersionId || undefined}
-          onSelectVersion={setSelectedVersionId}
-        />
+        {thinkHardProgress ? (
+          <div className="h-full flex items-center justify-center p-6">
+            <div className="w-full max-w-md">
+              <ThinkHardProgressView progress={thinkHardProgress} />
+            </div>
+          </div>
+        ) : (
+          <PersonaPanel
+            personas={personas}
+            onUpdatePersona={handleUpdatePersona}
+            onDeletePersona={deletePersona}
+            onDuplicatePersona={handleDuplicatePersona}
+            onClearAll={handleClearAll}
+            isLoading={isChatLoading}
+            isTransitioning={isTransitioning}
+            versions={personaVersions}
+            selectedVersionId={selectedVersionId || undefined}
+            onSelectVersion={setSelectedVersionId}
+          />
+        )}
       </div>
     </div>
   );
