@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, Column, ForeignKey
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -73,6 +73,16 @@ class Message(SQLModel, table=True):
     attachment_degraded_mode: bool = Field(default=False)
     attachment_truncated: bool = Field(default=False)
     attachment_char_count: Optional[int] = None
+    # Think Hard / job lifecycle
+    is_pending: bool = Field(default=False)  # UI hides content; shows progress
+    pending_generation_job_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column(
+            "pending_generation_job_id",
+            ForeignKey("generation_jobs.id", use_alter=True),
+            nullable=True,
+        ),
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     conversation: Conversation = Relationship(back_populates="messages")
@@ -230,4 +240,52 @@ class BlogPost(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
     )
+
+# ── Think Hard: quota, jobs, events ───────────────────────────────────────────
+
+class QuotaReservation(SQLModel, table=True):
+    __tablename__ = "quota_reservations"
+    id: str = Field(primary_key=True)  # UUID4 hex
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    feature: str  # "quick" | "think_hard" (later: homework, export)
+    state: str = Field(default="reserved")  # reserved | committed | refunded
+    period_key: str  # e.g. "2026-06" — UTC month, equality match
+    weight: int = Field(default=1)
+    committed_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class GenerationJob(SQLModel, table=True):
+    __tablename__ = "generation_jobs"
+    id: str = Field(primary_key=True)  # ULID-like hex
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    conversation_id: int = Field(foreign_key="conversations.id", ondelete="CASCADE", index=True)
+    parent_job_id: Optional[str] = Field(default=None, foreign_key="generation_jobs.id")
+    mode: str  # "quick" | "think_hard"
+    state: str = Field(default="queued")  # queued|running|persisting|succeeded|failed|timed_out
+    input_text: str
+    file_snapshot: Optional[str] = None  # JSON string: {file_id, mime_type, gemini_uri?, extracted_text?, char_count, truncated}
+    idempotency_key: Optional[str] = Field(default=None, index=True)
+    reservation_id: Optional[str] = Field(default=None, foreign_key="quota_reservations.id")
+    worker_id: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    expires_at: datetime
+    user_message_id: int = Field(foreign_key="messages.id")
+    assistant_message_id: int = Field(foreign_key="messages.id")
+    error_code: Optional[str] = None
+    error_detail: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class GenerationJobEvent(SQLModel, table=True):
+    __tablename__ = "generation_job_events"
+    id: Optional[int] = Field(default=None, primary_key=True)  # auto-increment, doubles as SSE Last-Event-ID
+    job_id: str = Field(foreign_key="generation_jobs.id", ondelete="CASCADE", index=True)
+    event_type: str  # state_changed|stage_started|stage_completed|stage_failed_soft|warning|terminal
+    payload: str  # JSON string
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

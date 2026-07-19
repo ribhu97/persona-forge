@@ -9,6 +9,8 @@ export interface Message {
     attachment?: AttachmentInfo;
     degraded_mode?: boolean;
     warnings?: string[];
+    is_pending?: boolean;
+    pending_generation_job_id?: string | null;
 }
 
 export interface Conversation {

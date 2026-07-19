@@ -33,7 +33,7 @@ const GENERATION_MODES = {
   think_hard: {
     label: 'Think Hard',
     icon: '🧠',
-    disabled: true,
+    disabled: false,
   },
   homework: {
     label: 'Do My Homework',

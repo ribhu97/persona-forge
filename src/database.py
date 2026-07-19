@@ -103,6 +103,21 @@ def create_db_and_tables():
             cursor.execute("ALTER TABLE messages ADD COLUMN attachment_char_count INTEGER")
             print("Successfully added attachment_char_count column to messages table")
 
+        if message_columns and 'is_pending' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN is_pending BOOLEAN DEFAULT 0")
+            print("Successfully added is_pending column to messages table")
+
+        if message_columns and 'pending_generation_job_id' not in message_columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN pending_generation_job_id TEXT")
+            print("Successfully added pending_generation_job_id column to messages table")
+
+        # generation_jobs: partial unique index for idempotency dedup
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_idempotency "
+            "ON generation_jobs (user_id, conversation_id, idempotency_key) "
+            "WHERE idempotency_key IS NOT NULL"
+        )
+
         # one_time_passwords table migrations
         cursor.execute("PRAGMA table_info(one_time_passwords)")
         otp_columns = [col[1] for col in cursor.fetchall()]
