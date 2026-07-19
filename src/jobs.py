@@ -20,16 +20,19 @@ The loser of a worker/sweeper race abandons its entire side-effect bundle.
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlmodel import Session, select
-from sqlalchemy import text as sa_text
+from sqlalchemy import bindparam, text as sa_text
 
 from src.database import engine
 from src.models import GenerationJob, GenerationJobEvent, Message, Conversation, UploadedFile
+
+logger = logging.getLogger(__name__)
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -72,6 +75,30 @@ FREE_RETRY_CODES = frozenset({
     ERR_PERSISTENCE_FAILURE,
     ERR_INTERNAL_ERROR,
 })
+
+# Client-facing messages per error code.  Raw exception detail is logged
+# server-side only — it may contain provider responses, paths, or auth errors.
+PUBLIC_ERROR_MESSAGES: dict[str, str] = {
+    ERR_TIER_REQUIRED: "Think Hard is a paid feature. Upgrade to use it.",
+    ERR_QUOTA_EXHAUSTED: "You've reached your monthly generation limit.",
+    ERR_INSUFFICIENT_DRAFTS: "Generation produced too few usable drafts. Please retry.",
+    ERR_INVALID_OUTPUT: "The model returned an unusable response. Please retry.",
+    ERR_PROVIDER_CAPACITY: "The AI provider is at capacity. Please retry in a moment.",
+    ERR_SAFETY_BLOCK: "The request was blocked by content safety filters.",
+    ERR_TIMEOUT: "Generation timed out. Please retry.",
+    ERR_UNSUPPORTED_ATTACHMENT: "The attached file type isn't supported for this mode.",
+    ERR_PERSISTENCE_FAILURE: "Saving the results failed. Please retry.",
+    ERR_INTERNAL_ERROR: "Something went wrong. Please retry.",
+}
+
+PUBLIC_ERROR_FALLBACK = "Something went wrong. Please retry."
+
+
+def public_error_message(error_code: Optional[str]) -> Optional[str]:
+    """Safe client-facing message for an error code (None passes through)."""
+    if error_code is None:
+        return None
+    return PUBLIC_ERROR_MESSAGES.get(error_code, PUBLIC_ERROR_FALLBACK)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -334,7 +361,8 @@ def claim_next_queued(worker_id: str) -> Optional[GenerationJob]:
         return job
 
 
-def transition(
+def transition_in_session(
+    session: Session,
     job_id: str,
     target_state: str,
     *,
@@ -343,45 +371,67 @@ def transition(
     error_detail: Optional[str] = None,
 ) -> bool:
     """
-    CAS transition to *target_state*.
+    Stage a CAS transition to *target_state* in the caller's session.  The
+    caller owns the transaction boundary (commit/rollback).
 
     Returns True if the transition succeeded (rowcount=1), False if the job
     was already in a terminal state or the expected state didn't match.
     """
     now = _now()
-    states_list = ",".join(f"'{s}'" for s in expected_states)
 
+    if target_state in TERMINAL_STATES:
+        result = session.execute(
+            sa_text(
+                "UPDATE generation_jobs "
+                "SET state=:target, finished_at=:now, updated_at=:now, "
+                "    error_code=:ec, error_detail=:ed "
+                "WHERE id=:jid AND state IN :states"
+            ).bindparams(
+                bindparam("states", expanding=True),
+                target=target_state,
+                now=now,
+                ec=error_code,
+                ed=error_detail,
+                jid=job_id,
+            ),
+            {"states": list(expected_states)},
+        )
+    else:
+        result = session.execute(
+            sa_text(
+                "UPDATE generation_jobs "
+                "SET state=:target, updated_at=:now "
+                "WHERE id=:jid AND state IN :states"
+            ).bindparams(
+                bindparam("states", expanding=True),
+                target=target_state,
+                now=now,
+                jid=job_id,
+            ),
+            {"states": list(expected_states)},
+        )
+    rowcount = result.rowcount if result.rowcount is not None else 0
+    return bool(rowcount)
+
+
+def transition(
+    job_id: str,
+    target_state: str,
+    *,
+    expected_states: tuple[str, ...] = NON_TERMINAL_STATES,
+    error_code: Optional[str] = None,
+    error_detail: Optional[str] = None,
+) -> bool:
+    """CAS transition in a standalone transaction.  See transition_in_session."""
     with Session(engine) as session:
-        if target_state in TERMINAL_STATES:
-            result = session.execute(
-                sa_text(
-                    f"UPDATE generation_jobs "
-                    f"SET state=:target, finished_at=:now, updated_at=:now, "
-                    f"    error_code=:ec, error_detail=:ed "
-                    f"WHERE id=:jid AND state IN ({states_list})"
-                ).bindparams(
-                    target=target_state,
-                    now=now,
-                    ec=error_code,
-                    ed=error_detail,
-                    jid=job_id,
-                )
-            )
-        else:
-            result = session.execute(
-                sa_text(
-                    f"UPDATE generation_jobs "
-                    f"SET state=:target, updated_at=:now "
-                    f"WHERE id=:jid AND state IN ({states_list})"
-                ).bindparams(
-                    target=target_state,
-                    now=now,
-                    jid=job_id,
-                )
-            )
-        rowcount = result.rowcount if result.rowcount is not None else 0
+        ok = transition_in_session(
+            session, job_id, target_state,
+            expected_states=expected_states,
+            error_code=error_code,
+            error_detail=error_detail,
+        )
         session.commit()
-        return bool(rowcount)
+        return ok
 
 
 def get_job(job_id: str) -> Optional[GenerationJob]:
@@ -401,14 +451,21 @@ def fail_job(
     """
     Transition a job to 'failed', emit a terminal event, and refund the
     reservation.  CAS-guarded — only one caller wins.
+
+    *error_detail* may contain raw exception text; it is logged server-side
+    only.  The row and the terminal event carry the safe public message.
     """
     from src import quota
+
+    if error_detail:
+        logger.error("[jobs] job %s failed (%s): %s", job_id, error_code, error_detail)
+    safe_detail = public_error_message(error_code)
 
     ok = transition(
         job_id, STATE_FAILED,
         expected_states=NON_TERMINAL_STATES,
         error_code=error_code,
-        error_detail=error_detail,
+        error_detail=safe_detail,
     )
     if not ok:
         return False
@@ -418,7 +475,7 @@ def fail_job(
         emit_event(session, job_id, "terminal", {
             "state": STATE_FAILED,
             "error_code": error_code,
-            "error_detail": error_detail,
+            "error_detail": safe_detail,
             "assistant_message_id": None,
             "persona_count": None,
         })
@@ -447,6 +504,7 @@ def timeout_job(job_id: str, reservation_id: Optional[str] = None) -> bool:
         job_id, STATE_TIMED_OUT,
         expected_states=(STATE_QUEUED, STATE_RUNNING, STATE_PERSISTING),
         error_code=ERR_TIMEOUT,
+        error_detail=public_error_message(ERR_TIMEOUT),
     )
     if not ok:
         return False
@@ -537,14 +595,31 @@ def sweep_old_events(session: Session) -> int:
 
 def recover_orphaned_running_jobs(session: Session) -> int:
     """
-    On startup (single-instance), any 'running' row is provably orphaned.
-    Reset to 'queued' if not expired, else 'timed_out' + refund.
+    On startup (single-instance), any 'running' or 'persisting' row is provably
+    orphaned.
+
+    'persisting' orphans: the final transaction is atomic (personas + quota
+    commit + succeeded transition in one txn), so an orphan here means nothing
+    was persisted — fail with persistence_failure and refund.  The user gets a
+    free retry.
+
+    'running' orphans: reset to 'queued' if not expired, else 'timed_out' + refund.
     """
-    stmt = select(GenerationJob).where(GenerationJob.state == STATE_RUNNING)
+    stmt = select(GenerationJob).where(
+        GenerationJob.state.in_([STATE_RUNNING, STATE_PERSISTING])
+    )
     orphans = session.exec(stmt).all()
     count = 0
     now = _now()
     for job in orphans:
+        if job.state == STATE_PERSISTING:
+            if fail_job(
+                job.id, ERR_PERSISTENCE_FAILURE,
+                error_detail="orphaned in persisting state at startup",
+                reservation_id=job.reservation_id,
+            ):
+                count += 1
+            continue
         expires = _utc(job.expires_at) or now
         if now > expires:
             timeout_job(job.id, job.reservation_id)

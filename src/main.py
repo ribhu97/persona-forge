@@ -52,8 +52,9 @@ async def lifespan(app: FastAPI):
     from src import jobs as jobs_mod
     from src.think_hard import run_job
 
+    JOB_POOL_WORKERS = 4  # concurrent generation jobs (distinct from draft parallelism)
     worker_stop = threading.Event()
-    worker_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="job-worker")
+    worker_pool = ThreadPoolExecutor(max_workers=JOB_POOL_WORKERS, thread_name_prefix="job-worker")
 
     def _job_done_callback(future, job_id):
         """Force-fail the job if the future raised an unhandled exception."""
@@ -104,7 +105,7 @@ async def lifespan(app: FastAPI):
 
     worker_thread = threading.Thread(target=_worker_loop, daemon=True, name="job-worker-loop")
     worker_thread.start()
-    logger.info("Job worker started (worker_id=%s, max_workers=4)", f"worker-{os.getpid()}")
+    logger.info("Job worker started (worker_id=%s, max_workers=%d)", f"worker-{os.getpid()}", JOB_POOL_WORKERS)
 
     yield
 

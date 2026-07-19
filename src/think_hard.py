@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 MAX_DRAFT_RETRIES = 1
 DRAFT_TIMEOUT_S = 60
-MAX_WORKERS = 4  # ThreadPoolExecutor for parallel drafts
+DRAFT_PARALLELISM = 4  # ThreadPoolExecutor for parallel drafts (unrelated to the job worker pool)
 
 
 # ── Retry wrapper ─────────────────────────────────────────────────────────────
@@ -172,6 +172,20 @@ def _save_personas(session: Session, message_id: int, user_id: int, personas_dat
 
 # ── Stage functions ───────────────────────────────────────────────────────────
 
+def _render_prompt(template: str, **subs: str) -> str:
+    """
+    Fill {name} placeholders via replace (values contain JSON, so .format()
+    would choke on braces).  Asserts each placeholder exists in the template
+    so a renamed placeholder fails loudly instead of silently no-oping.
+    """
+    for name, value in subs.items():
+        placeholder = "{" + name + "}"
+        if placeholder not in template:
+            raise ValueError(f"Prompt template missing placeholder {placeholder}")
+        template = template.replace(placeholder, value)
+    return template
+
+
 def _run_draft(
     input_text: str,
     file_context: Optional[dict],
@@ -197,7 +211,7 @@ def _run_judge(drafts: list[dict]) -> dict:
         [{"index": i, "draft": d} for i, d in enumerate(drafts)],
         indent=2,
     )
-    prompt = think_hard_judge_prompt.replace("{candidates}", candidates_json)
+    prompt = _render_prompt(think_hard_judge_prompt, candidates=candidates_json)
 
     def _call():
         result = call_with_fallback(prompt, "Evaluate the candidate drafts and select the best.")
@@ -210,7 +224,7 @@ def _run_judge(drafts: list[dict]) -> dict:
 def _run_critique(winner: dict) -> dict:
     """Run the critique stage. Returns validated critique output."""
     candidate_json = json.dumps(winner, indent=2)
-    prompt = think_hard_critique_prompt.replace("{candidate}", candidate_json)
+    prompt = _render_prompt(think_hard_critique_prompt, candidate=candidate_json)
 
     def _call():
         result = call_with_fallback(prompt, "Critique the candidate persona set.")
@@ -224,7 +238,7 @@ def _run_revise(winner: dict, critique: dict) -> dict:
     """Run the revise stage. Returns validated revised personas."""
     candidate_json = json.dumps(winner, indent=2)
     critique_json = json.dumps(critique, indent=2)
-    prompt = think_hard_revise_prompt.replace("{candidate}", candidate_json).replace("{critique}", critique_json)
+    prompt = _render_prompt(think_hard_revise_prompt, candidate=candidate_json, critique=critique_json)
 
     def _call():
         result = call_with_fallback(prompt, "Revise the persona draft based on critique.")
@@ -243,13 +257,34 @@ def _emit(job_id: str, event_type: str, payload: dict) -> None:
         session.commit()
 
 
+def _emit_soft_failure(job_id: str, stage: str, exc: Exception, **extra) -> None:
+    """
+    Emit a stage_failed_soft event with a sanitized payload.  Event payloads
+    stream to the client verbatim, so raw exception text stays in the log.
+    """
+    code, raw_detail = _classify_error(exc)
+    logger.warning("[think_hard] job %s stage %s soft-failed (%s): %s",
+                   job_id, stage, code, raw_detail)
+    _emit(job_id, "stage_failed_soft", {
+        "stage": stage,
+        "error_code": code,
+        "error": jobs.public_error_message(code),
+        **extra,
+    })
+
+
 # ── Final transaction ─────────────────────────────────────────────────────────
 
 def _final_transaction(job: GenerationJob, personas_data: list) -> bool:
     """
-    Atomically: transition to persisting -> save personas -> fill assistant
-    message -> commit quota -> transition to succeeded -> emit terminal event.
-    CAS-guarded.
+    Persist the job's results atomically.
+
+    After the CAS claim of 'persisting' (its own small txn — just a guard),
+    everything happens in ONE transaction: save personas, fill the assistant
+    message, commit the quota reservation, CAS-transition to 'succeeded', and
+    emit the terminal event.  A crash at any point before commit leaves the job
+    in 'persisting' with nothing persisted and the reservation still 'reserved',
+    so orphan recovery can safely fail + refund it.
     """
     if not jobs.transition(job.id, jobs.STATE_PERSISTING):
         return False
@@ -261,7 +296,7 @@ def _final_transaction(job: GenerationJob, personas_data: list) -> bool:
                 raise RuntimeError(f"Assistant message {job.assistant_message_id} not found")
 
             msg.is_pending = False
-            msg.content = "Generated personas"
+            msg.content = f"Generated {len(personas_data)} personas"
             msg.pending_generation_job_id = None
             session.add(msg)
             session.flush()
@@ -274,30 +309,32 @@ def _final_transaction(job: GenerationJob, personas_data: list) -> bool:
                 conv.last_message_at = datetime.now(timezone.utc)
                 session.add(conv)
 
+            if job.reservation_id:
+                quota.commit_in_session(
+                    session, job.reservation_id,
+                    message_id=job.assistant_message_id,
+                )
+
+            if not jobs.transition_in_session(
+                session, job.id, jobs.STATE_SUCCEEDED,
+                expected_states=(jobs.STATE_PERSISTING,),
+            ):
+                logger.error("[think_hard] job %s CAS failed on success", job.id)
+                session.rollback()
+                return False
+
+            jobs.emit_event(session, job.id, "terminal", {
+                "state": jobs.STATE_SUCCEEDED,
+                "error_code": None,
+                "assistant_message_id": job.assistant_message_id,
+                "persona_count": len(personas_data),
+            })
+
             session.commit()
-            session.refresh(msg)
-            persona_count = len(msg.personas)
-
-        if job.reservation_id:
-            quota.commit(job.reservation_id, message_id=job.assistant_message_id)
-
-        ok = jobs.transition(job.id, jobs.STATE_SUCCEEDED)
-        if not ok:
-            logger.error("[think_hard] job %s CAS failed on success", job.id)
-            return False
-
-        _emit(job.id, "terminal", {
-            "state": jobs.STATE_SUCCEEDED,
-            "error_code": None,
-            "assistant_message_id": job.assistant_message_id,
-            "persona_count": persona_count,
-        })
         return True
 
     except Exception as e:
         logger.error("[think_hard] final txn failed for job %s: %s", job.id, e)
-        if job.reservation_id:
-            quota.refund(job.reservation_id)
         jobs.fail_job(
             job.id, jobs.ERR_PERSISTENCE_FAILURE,
             error_detail=str(e),
@@ -368,7 +405,7 @@ def _run_think_hard(job: GenerationJob, file_context: Optional[dict]) -> None:
     drafts: list[dict] = []
     draft_errors: list[str] = []
 
-    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(DRAFT_ANGLE_SUFFIXES))) as pool:
+    with ThreadPoolExecutor(max_workers=min(DRAFT_PARALLELISM, len(DRAFT_ANGLE_SUFFIXES))) as pool:
         futures = {
             pool.submit(
                 _run_draft, job.input_text, file_context, suffix, idx
@@ -386,9 +423,7 @@ def _run_think_hard(job: GenerationJob, file_context: Optional[dict]) -> None:
                 })
             except Exception as e:
                 draft_errors.append(f"angle {idx}: {e}")
-                _emit(job.id, "stage_failed_soft", {
-                    "stage": "draft", "angle_index": idx, "error": str(e),
-                })
+                _emit_soft_failure(job.id, "draft", e, angle_index=idx)
 
     if len(drafts) < 2:
         code = jobs.ERR_INSUFFICIENT_DRAFTS
@@ -414,10 +449,7 @@ def _run_think_hard(job: GenerationJob, file_context: Optional[dict]) -> None:
     except Exception as e:
         # Soft-fail: use the first draft
         winner = drafts[0]
-        _emit(job.id, "stage_failed_soft", {
-            "stage": "judge", "error": str(e),
-            "fallback": "using first draft",
-        })
+        _emit_soft_failure(job.id, "judge", e, fallback="using first draft")
 
     if _deadline_expired(job):
         jobs.timeout_job(job.id, job.reservation_id)
@@ -433,10 +465,7 @@ def _run_think_hard(job: GenerationJob, file_context: Optional[dict]) -> None:
             "issue_count": len(critique.get("issues", [])),
         })
     except Exception as e:
-        _emit(job.id, "stage_failed_soft", {
-            "stage": "critique", "error": str(e),
-            "fallback": "skipping revision",
-        })
+        _emit_soft_failure(job.id, "critique", e, fallback="skipping revision")
 
     if _deadline_expired(job):
         jobs.timeout_job(job.id, job.reservation_id)
@@ -451,10 +480,7 @@ def _run_think_hard(job: GenerationJob, file_context: Optional[dict]) -> None:
             final_personas = revised
             _emit(job.id, "stage_completed", {"stage": "revise"})
         except Exception as e:
-            _emit(job.id, "stage_failed_soft", {
-                "stage": "revise", "error": str(e),
-                "fallback": "using pre-revision winner",
-            })
+            _emit_soft_failure(job.id, "revise", e, fallback="using pre-revision winner")
 
     # ── Final transaction ──
     _final_transaction(job, final_personas.get("personas", []))

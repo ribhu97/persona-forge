@@ -185,10 +185,13 @@ export function MainAppView() {
         setShouldShowSplit(true);
 
         try {
+          // One key per user send attempt — backend dedups duplicate submissions
+          const idempotencyKey = crypto.randomUUID();
           const job = await jobsAPI.createJob(conv.id, {
             text: data.text,
             mode: 'think_hard',
             file_id: data.fileId,
+            idempotency_key: idempotencyKey,
           });
 
           // Fetch messages to get the pending assistant message

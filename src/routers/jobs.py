@@ -9,11 +9,14 @@ Job API endpoints for Think Hard and Quick mode generation.
 import asyncio
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Annotated, AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlmodel import Session
 
 from src.database import get_session
@@ -26,10 +29,16 @@ from src import quota
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/conversations", tags=["jobs"])
+limiter = Limiter(key_func=get_remote_address)
 
 SSE_HEARTBEAT_S = 15
 SSE_POLL_INTERVAL_S = 1.0
 SSE_MAX_DURATION_S = 360  # 6 min — slightly longer than JOB_DEADLINE
+MAX_CONCURRENT_STREAMS_PER_USER = 3
+
+# In-process per-user SSE stream counter (single-instance app)
+_active_streams: dict[int, int] = {}
+_active_streams_lock = threading.Lock()
 
 
 def _verify_conversation(session: Session, conversation_id: int, user: User) -> Conversation:
@@ -54,7 +63,9 @@ def _job_to_response(job: GenerationJob) -> dict:
 
 
 @router.post("/{conversation_id}/jobs", response_model=JobResponse)
+@limiter.limit("20/minute")
 async def create_job_endpoint(
+    request: Request,
     conversation_id: int,
     data: JobCreateRequest,
     user: Annotated[User, Depends(get_current_user)],
@@ -104,11 +115,17 @@ async def get_job_endpoint(
 
 
 def _format_sse_event(event_id: int, event_type: str, payload: str) -> str:
-    """Format a single SSE event."""
-    return f"id: {event_id}\nevent: {event_type}\ndata: {payload}\n\n"
+    """
+    Format a single SSE event.  Pass event_id=0 for synthetic events (no DB
+    row): the id line is omitted so the client's Last-Event-ID keeps pointing
+    at the last real event.
+    """
+    id_line = f"id: {event_id}\n" if event_id > 0 else ""
+    return f"{id_line}event: {event_type}\ndata: {payload}\n\n"
 
 
 @router.get("/{conversation_id}/jobs/{job_id}/events")
+@limiter.limit("30/minute")
 async def stream_job_events(
     conversation_id: int,
     job_id: str,
@@ -125,6 +142,11 @@ async def stream_job_events(
     if not job or job.conversation_id != conversation_id or job.user_id != user.id:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    with _active_streams_lock:
+        if _active_streams.get(user.id, 0) >= MAX_CONCURRENT_STREAMS_PER_USER:
+            raise HTTPException(status_code=429, detail="Too many concurrent event streams")
+        _active_streams[user.id] = _active_streams.get(user.id, 0) + 1
+
     last_event_id = 0
     lei_header = request.headers.get("last-event-id")
     if lei_header:
@@ -139,41 +161,52 @@ async def stream_job_events(
         cursor = last_event_id
         terminal_sent = False
 
-        while True:
-            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
-            if elapsed > SSE_MAX_DURATION_S:
-                yield _format_sse_event(0, "stream_timeout", json.dumps({"reason": "max_duration"}))
-                break
+        try:
+            while True:
+                elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+                if elapsed > SSE_MAX_DURATION_S:
+                    yield _format_sse_event(0, "stream_timeout", json.dumps({"reason": "max_duration"}))
+                    break
 
-            if await request.is_disconnected():
-                break
+                if await request.is_disconnected():
+                    break
 
-            events = jobs_mod.get_events_since(job_id, cursor)
-            for event in events:
-                cursor = event.id
-                yield _format_sse_event(event.id, event.event_type, event.payload)
-                if event.event_type == "terminal":
-                    terminal_sent = True
+                events = jobs_mod.get_events_since(job_id, cursor)
+                for event in events:
+                    cursor = event.id
+                    yield _format_sse_event(event.id, event.event_type, event.payload)
+                    if event.event_type == "terminal":
+                        terminal_sent = True
 
-            if terminal_sent:
-                break
+                if terminal_sent:
+                    break
 
-            now = datetime.now(timezone.utc)
-            if (now - last_heartbeat).total_seconds() >= SSE_HEARTBEAT_S:
-                yield ": keepalive\n\n"
-                last_heartbeat = now
+                now = datetime.now(timezone.utc)
+                if (now - last_heartbeat).total_seconds() >= SSE_HEARTBEAT_S:
+                    yield ": keepalive\n\n"
+                    last_heartbeat = now
 
-            current_job = jobs_mod.get_job(job_id)
-            if current_job and current_job.state in jobs_mod.TERMINAL_STATES and not terminal_sent:
-                yield _format_sse_event(cursor, "terminal", json.dumps({
-                    "state": current_job.state,
-                    "error_code": current_job.error_code,
-                    "assistant_message_id": current_job.assistant_message_id,
-                    "persona_count": None,
-                }))
-                break
+                current_job = jobs_mod.get_job(job_id)
+                if current_job and current_job.state in jobs_mod.TERMINAL_STATES and not terminal_sent:
+                    # Synthetic event (job row terminal before the DB terminal
+                    # event is visible) — id 0 so reconnecting clients resume
+                    # from the last real event.
+                    yield _format_sse_event(0, "terminal", json.dumps({
+                        "state": current_job.state,
+                        "error_code": current_job.error_code,
+                        "assistant_message_id": current_job.assistant_message_id,
+                        "persona_count": None,
+                    }))
+                    break
 
-            await asyncio.sleep(SSE_POLL_INTERVAL_S)
+                await asyncio.sleep(SSE_POLL_INTERVAL_S)
+        finally:
+            with _active_streams_lock:
+                remaining = _active_streams.get(user.id, 1) - 1
+                if remaining <= 0:
+                    _active_streams.pop(user.id, None)
+                else:
+                    _active_streams[user.id] = remaining
 
     return StreamingResponse(
         event_stream(),
@@ -183,7 +216,9 @@ async def stream_job_events(
 
 
 @router.post("/{conversation_id}/jobs/{job_id}/retry", response_model=JobResponse)
+@limiter.limit("20/minute")
 async def retry_job_endpoint(
+    request: Request,
     conversation_id: int,
     job_id: str,
     user: Annotated[User, Depends(get_current_user)],

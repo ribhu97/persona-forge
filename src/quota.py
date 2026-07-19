@@ -119,28 +119,36 @@ def reserve(
             raise
 
 
-def commit(reservation_id: str, *, message_id: int) -> bool:
+def commit_in_session(session: Session, reservation_id: str, *, message_id: int) -> bool:
     """
-    Commit a reservation (state: reserved -> committed).
+    Stage a reservation commit (state: reserved -> committed) into the caller's
+    session without committing — the caller owns the transaction boundary.
 
     Idempotent: if already committed, returns True.  CAS-guarded: only
     transitions from 'reserved'.  Returns False if refunded or not found.
     """
-    with Session(engine) as session:
-        res = session.get(QuotaReservation, reservation_id)
-        if res is None:
-            return False
-        if res.state == "committed":
-            return True
-        if res.state != "reserved":
-            return False
-
-        res.state = "committed"
-        res.committed_message_id = message_id
-        res.updated_at = datetime.now(timezone.utc)
-        session.add(res)
-        session.commit()
+    res = session.get(QuotaReservation, reservation_id)
+    if res is None:
+        return False
+    if res.state == "committed":
         return True
+    if res.state != "reserved":
+        return False
+
+    res.state = "committed"
+    res.committed_message_id = message_id
+    res.updated_at = datetime.now(timezone.utc)
+    session.add(res)
+    return True
+
+
+def commit(reservation_id: str, *, message_id: int) -> bool:
+    """Commit a reservation in a standalone transaction.  See commit_in_session."""
+    with Session(engine) as session:
+        ok = commit_in_session(session, reservation_id, message_id=message_id)
+        if ok:
+            session.commit()
+        return ok
 
 
 def refund(reservation_id: Optional[str]) -> bool:

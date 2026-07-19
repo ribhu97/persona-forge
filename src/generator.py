@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Optional
 
@@ -18,6 +19,8 @@ from src.prompts import (
 from src.schemas import PERSONA_CHAT_MOODS, PERSONA_CHAT_TRAIT_SOURCE_TYPES
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 GEMINI_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT_S", "30"))  # seconds
 GROQ_TIMEOUT = int(os.environ.get("GROQ_TIMEOUT_S", "30"))  # seconds
@@ -177,9 +180,9 @@ def call_with_fallback(
     except genai_errors.ClientError as e:
         if e.code not in (429, 503, 500, 502, 504):
             raise
-        print(f"[think_hard] Gemini client error {e.code}, falling back to Groq.")
+        logger.warning("[think_hard] Gemini client error %s, falling back to Groq.", e.code)
     except genai_errors.ServerError as e:
-        print(f"[think_hard] Gemini server error, falling back to Groq: {e}")
+        logger.warning("[think_hard] Gemini server error, falling back to Groq: %s", e)
     except SafetyBlockError:
         file_type = (file_context or {}).get("mime_type", (file_context or {}).get("file_type", ""))
         has_extracted = bool((file_context or {}).get("extracted_text"))
@@ -187,7 +190,7 @@ def call_with_fallback(
             raise UnsupportedAttachmentError(
                 "Gemini safety-blocked and Groq cannot process image attachments."
             )
-        print("[think_hard] Gemini safety-blocked, falling back to Groq.")
+        logger.warning("[think_hard] Gemini safety-blocked, falling back to Groq.")
     except AllProvidersRateLimitedError:
         raise
 
