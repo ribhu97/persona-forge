@@ -17,6 +17,46 @@ import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProg
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useChatStore } from '@/stores/chatStore';
+import { Helmet } from 'react-helmet-async';
+
+// Homepage-only SEO. Lives here (not in index.html) because vite-react-ssg copies the
+// index.html <head> onto every pre-rendered page — a canonical there would leak onto
+// blog posts and every other route. Title/description come from the layout Helmet (App.tsx).
+const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz';
+
+const HOME_JSON_LD = {
+  softwareApplication: {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Persona Forge',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: SITE_URL,
+    description:
+      'AI-powered user persona generator. Describe your product and get detailed, structured user personas in under 10 minutes.',
+    offers: [
+      { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Plus', price: '5', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Pro', price: '10', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Lifetime Plus', price: '200', priceCurrency: 'USD' },
+    ],
+    publisher: { '@type': 'Organization', name: 'Pehloo', url: 'https://pehloo.xyz' },
+  },
+  organization: {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Persona Forge',
+    alternateName: 'Pehloo Persona Forge',
+    url: SITE_URL,
+    description: 'AI-powered user persona generation tool by Pehloo.',
+    contactPoint: {
+      '@type': 'ContactPoint',
+      email: 'ribhu.lahiri@gmail.com',
+      contactType: 'customer support',
+    },
+    parentOrganization: { '@type': 'Organization', name: 'Pehloo', url: 'https://pehloo.xyz' },
+  },
+};
 
 export function MainAppView() {
   const { onLogin } = useAppContext();
@@ -351,6 +391,26 @@ export function MainAppView() {
 
   return (
     <div className="h-screen w-screen overflow-hidden relative">
+      <Helmet>
+        <link rel="canonical" href={`${SITE_URL}/`} />
+        <meta property="og:title" content="Persona Forge — AI User Persona Generator by Pehloo" />
+        <meta property="og:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+        <meta property="og:url" content={`${SITE_URL}/`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Persona Forge — AI User Persona Generator" />
+        <meta name="twitter:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+        <meta name="twitter:image" content={`${SITE_URL}/og-image.png`} />
+      </Helmet>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.softwareApplication) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.organization) }}
+      />
       <ErrorBoundary>
         <div className="absolute top-4 right-4 z-50 flex items-center gap-6">
           {!isInitialState && (

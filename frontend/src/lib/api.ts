@@ -318,7 +318,7 @@ export const jobsAPI = {
   },
 
   streamJobEvents: (conversationId: number, jobId: string, callbacks: {
-    onEvent: (event: { id: number | null; event: string | null; data: string }) => void;
+    onEvent: (event: { id: string | null; event: string | null; data: string }) => void;
     onError?: (error: Error) => void;
     onClose?: () => void;
     lastEventId?: number;

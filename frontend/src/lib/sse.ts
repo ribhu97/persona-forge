@@ -22,11 +22,13 @@ export interface SSEClientOptions {
 }
 
 export class SSEClient {
+  private options: SSEClientOptions;
   private controller: AbortController | null = null;
   private lastEventId: number;
   private closed = false;
 
-  constructor(private options: SSEClientOptions) {
+  constructor(options: SSEClientOptions) {
+    this.options = options;
     this.lastEventId = options.lastEventId || 0;
   }
 
