@@ -157,6 +157,8 @@ class MessageResponse(BaseModel):
     attachment: Optional[AttachmentInfo] = None
     degraded_mode: bool = False
     warnings: List[str] = []
+    is_pending: bool = False
+    pending_generation_job_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -293,4 +295,36 @@ class PersonaChatFeedbackRequest(BaseModel):
 
 class PersonaChatTagsRequest(BaseModel):
     tags: List[Literal["insight", "friction", "quote"]]
+
+
+# ── Job / Think Hard schemas ──────────────────────────────────────────────────
+
+class JobCreateRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=8000)
+    mode: Literal["quick", "think_hard"] = "think_hard"
+    file_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+
+class JobResponse(BaseModel):
+    id: str
+    state: str
+    mode: str
+    error_code: Optional[str] = None
+    error_detail: Optional[str] = None
+    assistant_message_id: Optional[int] = None
+    created_at: datetime
+    expires_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class JobEventResponse(BaseModel):
+    id: int
+    job_id: str
+    event_type: str
+    payload: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 

@@ -48,11 +48,13 @@ async function blogPostLoader({ params }: LoaderFunctionArgs) {
   return res.json()
 }
 
-function getBlogSlugs(): string[] {
+// getStaticPaths — runs at build time only. Must use dynamic import (not require):
+// routes.tsx is bundled as ESM for the SSR build, where `require` is undefined, and it's
+// also imported by the client bundle, so node modules can't be imported at top level.
+async function getBlogSlugs(): Promise<string[]> {
   try {
-    const { readFileSync } = require('fs')
-    const { resolve } = require('path')
-    const dataPath = resolve(process.cwd(), '.generated/blog-posts.json')
+    const { readFileSync } = await import('node:fs')
+    const dataPath = await getBlogDataPath()
     const posts = JSON.parse(readFileSync(dataPath, 'utf-8'))
     return posts.map((p: any) => `/blog/${p.slug}`)
   } catch {

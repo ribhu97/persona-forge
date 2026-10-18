@@ -62,7 +62,7 @@ export default function AppLayout() {
     <HelmetProvider>
       <Helmet>
         <title>Persona Forge — AI User Persona Generator by Pehloo</title>
-        <meta name="description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes. Built on Google Gemini. Free to start." />
+        <meta name="description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes. Free to start." />
       </Helmet>
       <Outlet context={{ onLogin: openLogin } satisfies AppOutletContext} />
       {isMounted && <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />}

@@ -11,7 +11,9 @@ import type {
   BackendPersona,
   Persona,
   UploadResponse,
+  JobResponse,
 } from '@/types';
+import { SSEClient } from '@/lib/sse';
 
 export interface AppError {
   message: string;
@@ -282,5 +284,56 @@ export const blogAPI = {
   getBySlug: async (slug: string): Promise<BlogPostFull> => {
     const response = await apiClient.get<BlogPostFull>(`/blog/${slug}`);
     return response.data;
+  },
+};
+
+// ── Jobs API (Think Hard) ─────────────────────────────────────────────────────
+
+export const jobsAPI = {
+  createJob: async (conversationId: number, data: {
+    text: string;
+    mode: 'quick' | 'think_hard';
+    file_id?: string;
+    idempotency_key?: string;
+  }): Promise<JobResponse> => {
+    const response = await apiClient.post<JobResponse>(
+      `/conversations/${conversationId}/jobs`,
+      data
+    );
+    return response.data;
+  },
+
+  getJob: async (conversationId: number, jobId: string): Promise<JobResponse> => {
+    const response = await apiClient.get<JobResponse>(
+      `/conversations/${conversationId}/jobs/${jobId}`
+    );
+    return response.data;
+  },
+
+  retryJob: async (conversationId: number, jobId: string): Promise<JobResponse> => {
+    const response = await apiClient.post<JobResponse>(
+      `/conversations/${conversationId}/jobs/${jobId}/retry`
+    );
+    return response.data;
+  },
+
+  streamJobEvents: (conversationId: number, jobId: string, callbacks: {
+    onEvent: (event: { id: string | null; event: string | null; data: string }) => void;
+    onError?: (error: Error) => void;
+    onClose?: () => void;
+    lastEventId?: number;
+  }) => {
+    const baseURL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const sseClient = new SSEClient({
+      url: `${baseURL}/conversations/${conversationId}/jobs/${jobId}/events`,
+      token: token || '',
+      lastEventId: callbacks.lastEventId,
+      onEvent: callbacks.onEvent,
+      onError: callbacks.onError,
+      onClose: callbacks.onClose,
+    });
+    sseClient.connect();
+    return sseClient; // caller can .close() to abort
   },
 };

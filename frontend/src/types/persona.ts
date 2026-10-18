@@ -146,3 +146,41 @@ export interface ExportStatus {
 }
 
 export type ExportFormat = 'pdf' | 'json';
+
+// ── Job / Think Hard types ────────────────────────────────────────────────────
+
+export interface JobResponse {
+  id: string;
+  state: 'queued' | 'running' | 'persisting' | 'succeeded' | 'failed' | 'timed_out';
+  mode: 'quick' | 'think_hard';
+  error_code: string | null;
+  error_detail: string | null;
+  assistant_message_id: number | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface JobCreateRequest {
+  text: string;
+  mode: 'quick' | 'think_hard';
+  file_id?: string;
+  idempotency_key?: string;
+}
+
+export interface JobEvent {
+  id: number | null;
+  event: string | null;
+  data: string;
+}
+
+export type ThinkHardStage =
+  | 'queued' | 'running' | 'draft' | 'judge'
+  | 'critique' | 'revise' | 'persisting'
+  | 'succeeded' | 'failed' | 'timed_out';
+
+export interface ThinkHardProgress {
+  stage: ThinkHardStage;
+  message: string;
+  isTerminal: boolean;
+  error?: string | null;
+}

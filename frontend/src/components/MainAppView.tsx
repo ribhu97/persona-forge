@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Grip, X } from 'lucide-react';
-import type { BackendPersona, Persona, PersonaVersion } from '@/types';
+import { Helmet } from 'react-helmet-async';
+import { isAxiosError } from 'axios';
+import type { BackendPersona, GenerationMode, Persona, PersonaVersion, ProcessedFile, ThinkHardProgress } from '@/types';
 import { useAppContext } from '@/App';
 import { useAuthStore } from '@/stores/authStore';
 import { useChatStore } from '@/stores/chatStore';
 import { usePersonaStore } from '@/stores/personaStore';
-import { personaAPI } from '@/lib/api';
+import { personaAPI, jobsAPI } from '@/lib/api';
 import { SearchInterface } from '@/components/search/SearchInterface';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { CanvasWorkspace } from '@/components/canvas/CanvasWorkspace';
@@ -16,6 +18,46 @@ import { UserStatus } from '@/components/auth/UserStatus';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProgress';
+
+// Homepage-only SEO. Lives here (not in index.html) because vite-react-ssg copies the
+// index.html <head> onto every pre-rendered page — a canonical there would leak onto
+// blog posts and every other route. Title/description come from the layout Helmet (App.tsx).
+const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'https://personaforge.pehloo.xyz';
+
+const HOME_JSON_LD = {
+  softwareApplication: {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Persona Forge',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: SITE_URL,
+    description:
+      'AI-powered user persona generator. Describe your product and get detailed, structured user personas in under 10 minutes.',
+    offers: [
+      { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Plus', price: '5', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Pro', price: '10', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Lifetime Plus', price: '200', priceCurrency: 'USD' },
+    ],
+    publisher: { '@type': 'Organization', name: 'Pehloo', url: 'https://pehloo.xyz' },
+  },
+  organization: {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Persona Forge',
+    alternateName: 'Pehloo Persona Forge',
+    url: SITE_URL,
+    description: 'AI-powered user persona generation tool by Pehloo.',
+    contactPoint: {
+      '@type': 'ContactPoint',
+      email: 'ribhu.lahiri@gmail.com',
+      contactType: 'customer support',
+    },
+    parentOrganization: { '@type': 'Organization', name: 'Pehloo', url: 'https://pehloo.xyz' },
+  },
+};
 
 function convertPersona(p: BackendPersona): Persona {
   const strings = (items: unknown, key: string): string[] => Array.isArray(items)
@@ -69,8 +111,17 @@ function defaultChatGeometry(): ChatGeometry {
 
 export function MainAppView() {
   const { onLogin } = useAppContext();
+  const navigate = useNavigate();
   const { personas, setPersonas, updatePersona, deletePersona, addPersona, clearAll } = usePersonaStore();
-  const { createConversation, sendMessage, messages, currentConversationId, isLoading, error } = useChatStore();
+  const {
+    createConversation,
+    sendMessage,
+    selectConversation,
+    messages,
+    currentConversationId,
+    isLoading,
+    error,
+  } = useChatStore();
   const { isAuthenticated } = useAuthStore();
   const [versions, setVersions] = useState<PersonaVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -83,6 +134,16 @@ export function MainAppView() {
   const chatDragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const chatResizeRef = useRef<{ x: number; y: number; ow: number; oh: number } | null>(null);
 
+  // Think Hard job state
+  const [thinkHardProgress, setThinkHardProgress] = useState<ThinkHardProgress | null>(null);
+  const sseClientRef = useRef<{ close: () => void } | null>(null);
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => { sseClientRef.current?.close(); };
+  }, []);
+
+  // Sync chat personas to persona store and handle versioning
   useEffect(() => {
     if (currentConversationId && messages.length > 0) {
       const nextVersions: PersonaVersion[] = messages.filter(message => message.personas?.length).map(message => ({
@@ -107,13 +168,78 @@ export function MainAppView() {
     setPersonas(selected.personas);
   }, [versions, selectedVersionId, setPersonas]);
 
-  const handleSearch = async (data: { text: string; mode: any; files: any[]; fileId?: string }) => {
+  const handleSearch = async (data: { text: string; mode: GenerationMode; files: ProcessedFile[]; fileId?: string }) => {
     if (!isAuthenticated) { onLogin(); return; }
     setTerminalOpen(true);
     try {
       if (!useChatStore.getState().currentConversationId) await createConversation(data.text);
-      await sendMessage(data.text, data.fileId);
-    } catch (err) { console.error('Failed to generate personas:', err); }
+
+      if (data.mode === 'think_hard') {
+        // ── Think Hard: create a job and stream events ──
+        const conversationId = useChatStore.getState().currentConversationId;
+        if (!conversationId) throw new Error('No conversation to attach the job to');
+        setThinkHardProgress({ stage: 'queued', message: 'Creating job...', isTerminal: false });
+
+        try {
+          // One key per user send attempt — backend dedups duplicate submissions
+          const idempotencyKey = crypto.randomUUID();
+          const job = await jobsAPI.createJob(conversationId, {
+            text: data.text,
+            mode: 'think_hard',
+            file_id: data.fileId,
+            idempotency_key: idempotencyKey,
+          });
+
+          // Fetch messages to get the pending assistant message
+          await selectConversation(conversationId);
+
+          // Subscribe to SSE events
+          sseClientRef.current?.close();
+          const sseClient = jobsAPI.streamJobEvents(conversationId, job.id, {
+            onEvent: (event) => {
+              if (event.event && event.data) {
+                const progress = parseJobEvent(event.event, event.data);
+                setThinkHardProgress(progress);
+
+                if (progress.isTerminal) {
+                  // On terminal, fetch messages to get the final personas
+                  setTimeout(() => {
+                    selectConversation(conversationId);
+                    setThinkHardProgress(null);
+                  }, 500);
+                  sseClientRef.current?.close();
+                }
+              }
+            },
+            onError: (err) => {
+              console.error('SSE error:', err);
+              setThinkHardProgress({
+                stage: 'failed',
+                message: 'Connection lost. Please refresh.',
+                isTerminal: true,
+                error: err.message,
+              });
+            },
+          });
+          sseClientRef.current = sseClient;
+        } catch (err) {
+          // 402 means the plan quota is exhausted; every other failure rethrows to the outer
+          // handler. `isAxiosError` narrows `unknown` without an unchecked cast.
+          if (isAxiosError(err) && err.response?.status === 402) {
+            setThinkHardProgress(null);
+            navigate('/pricing');
+            return;
+          }
+          throw err;
+        }
+      } else {
+        // ── Quick mode: existing synchronous flow ──
+        await sendMessage(data.text, data.fileId);
+      }
+    } catch (err) {
+      console.error('Failed to generate personas:', err);
+      setThinkHardProgress(null);
+    }
   };
 
   const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
@@ -125,7 +251,15 @@ export function MainAppView() {
   };
 
   const handleDuplicatePersona = (persona: Persona) => addPersona({ ...persona, id: `persona-${Date.now()}-duplicate`, name: `${persona.name} (Copy)` });
-  const handleClear = () => { useChatStore.getState().clearCurrentConversation(); clearAll(); setVersions([]); setChatPersona(null); setTerminalOpen(false); };
+  const handleClear = () => {
+    useChatStore.getState().clearCurrentConversation();
+    clearAll();
+    setVersions([]);
+    setChatPersona(null);
+    setTerminalOpen(false);
+    setThinkHardProgress(null);
+    sseClientRef.current?.close();
+  };
 
   const prompt = <SearchInterface onSubmit={handleSearch} isLoading={isLoading} variant="landing" />;
 
@@ -193,6 +327,29 @@ export function MainAppView() {
   const chatTarget = chatPersona && personas.find(persona => String(persona.id) === String(chatPersona.id)) || chatPersona;
 
   return <ErrorBoundary><div className="relative min-h-screen">
+    <Helmet>
+      <link rel="canonical" href={`${SITE_URL}/`} />
+      <meta property="og:title" content="Persona Forge — AI User Persona Generator by Pehloo" />
+      <meta property="og:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+      <meta property="og:url" content={`${SITE_URL}/`} />
+      <meta property="og:type" content="website" />
+      <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="Persona Forge — AI User Persona Generator" />
+      <meta name="twitter:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+      <meta name="twitter:image" content={`${SITE_URL}/og-image.png`} />
+    </Helmet>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.softwareApplication) }}
+    />
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.organization) }}
+    />
+    <div className="md:hidden absolute top-0 left-0 right-0 z-[60] bg-yellow-50 border-b border-yellow-200 text-yellow-900 text-xs text-center px-4 py-2 font-medium">
+      For the best experience, please use PersonaForge on a desktop.
+    </div>
     <CanvasWorkspace
       conversationId={currentConversationId}
       personas={personas}
@@ -220,6 +377,11 @@ export function MainAppView() {
       onSelectVersion={setSelectedVersionId}
     />
     {error && <div className="absolute bottom-20 left-1/2 z-[70] max-w-lg -translate-x-1/2 border-2 border-red-800 bg-red-950/70 px-4 py-3 text-sm text-red-200 shadow-[5px_5px_0_hsl(var(--foreground)/0.7)]">{error}</div>}
+    {/* Think Hard reports stage progress here rather than in a second panel: the canvas is the
+        whole surface now, and the terminal already shows the quick-mode spinner. */}
+    {thinkHardProgress && <div className="absolute bottom-20 left-1/2 z-[65] w-[min(520px,calc(100vw-2rem))] -translate-x-1/2">
+      <ThinkHardProgressView progress={thinkHardProgress} />
+    </div>}
     {chatTarget && <section
       className={`absolute z-[60] flex min-h-0 min-w-0 flex-col overflow-hidden border-2 border-border bg-background shadow-[8px_8px_0_hsl(var(--foreground)/0.75)]${chatInteraction ? ' select-none' : ''}`}
       style={{ left: chatBox.x, top: chatBox.y, width: chatBox.width, height: chatBox.height }}
