@@ -35,15 +35,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     lastFailedConversationId: null,
 
     fetchConversations: async () => {
-        set({ isLoading: true, error: null, errorType: null });
+        set({ error: null, errorType: null });
         try {
             const conversations = await chatAPI.getConversations();
             set({ conversations });
         } catch (error: any) {
             const appError = error.appError ?? { message: error.message, type: 'generic' as const };
             set({ error: appError.message, errorType: 'generic' });
-        } finally {
-            set({ isLoading: false });
         }
     },
 
@@ -69,6 +67,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     selectConversation: async (id: number) => {
         set({
             currentConversationId: id,
+        messages: [],
             isLoading: true,
             error: null,
             errorType: null,

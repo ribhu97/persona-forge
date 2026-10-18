@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
+import { Button } from '@/components/ui/button';
 import type { TraitAttribution } from '@/types/chat';
 import type { Persona } from '@/types';
 import { getFollowUpSuggestions } from './suggestions';
@@ -38,12 +39,12 @@ export function PersonaChatComposer({ persona, isLoading, lastTrait, messageCoun
   const followUps = messageCount >= 2 ? getFollowUpSuggestions(lastTrait) : [];
 
   return (
-    <div className="border-t border-border shrink-0" style={{ background: 'hsl(var(--background))' }}>
+    <div className="shrink-0 border-t-2 border-border bg-card">
       {/* Follow-up chips */}
       {followUps.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap px-4 pt-3 pb-1">
-          <span className="text-[10px] font-mono tracking-[0.12em] shrink-0 select-none" style={{ color: 'hsl(var(--muted-foreground) / 0.5)' }}>
-            ← FOLLOW-UP
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-1">
+          <span className="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+            ← Follow-up
           </span>
           {followUps.map((s, i) => (
             <button
@@ -51,13 +52,11 @@ export function PersonaChatComposer({ persona, isLoading, lastTrait, messageCoun
               onClick={() => { setValue(s); textareaRef.current?.focus(); }}
               onMouseEnter={() => setHoveredChip(i)}
               onMouseLeave={() => setHoveredChip(null)}
-              className="text-[11px] font-mono tracking-[0.1em] px-3 py-1 transition-all duration-150"
-              style={{
-                borderRadius: 0,
-                border: hoveredChip === i ? '2px solid #1a4a7a' : '1px solid hsl(var(--foreground) / 0.3)',
-                color: hoveredChip === i ? '#1a4a7a' : 'inherit',
-                background: 'hsl(var(--background))',
-              }}
+              className={`border px-2.5 py-0.5 font-mono text-[11px] transition-colors ${
+                hoveredChip === i
+                  ? 'border-signal-context text-signal-context'
+                  : 'border-foreground/25 text-muted-foreground hover:text-foreground'
+              }`}
             >
               {s}
             </button>
@@ -65,15 +64,9 @@ export function PersonaChatComposer({ persona, isLoading, lastTrait, messageCoun
         </div>
       )}
 
-      {/* Unified input container */}
+      {/* Composer field — same field language as the canvas composer. */}
       <div className="px-4 pt-2 pb-2">
-        <div
-          className="flex items-end transition-colors duration-150"
-          style={{
-            borderRadius: 0,
-            border: '1px solid hsl(var(--foreground) / 0.4)',
-          }}
-        >
+        <div className="flex items-end border-2 border-foreground/60 bg-background transition-colors focus-within:border-primary">
           <textarea
             ref={textareaRef}
             value={value}
@@ -83,50 +76,26 @@ export function PersonaChatComposer({ persona, isLoading, lastTrait, messageCoun
             placeholder={`Ask ${persona.name} anything…`}
             rows={3}
             maxLength={4000}
-            className="flex-1 resize-none bg-transparent px-3 py-2 text-sm font-mono focus:outline-none disabled:opacity-50"
-            style={{ borderRadius: 0 }}
-            onFocus={e => {
-              const parent = e.currentTarget.parentElement;
-              if (parent) parent.style.border = '1px solid hsl(var(--foreground))';
-            }}
-            onBlur={e => {
-              const parent = e.currentTarget.parentElement;
-              if (parent) parent.style.border = '1px solid hsl(var(--foreground) / 0.4)';
-            }}
+            className="flex-1 resize-none bg-transparent px-3 py-2 font-mono text-sm focus:outline-none disabled:opacity-50"
           />
-          <button
+          <Button
+            size="sm"
+            className="m-1.5 shrink-0"
             onClick={handleSubmit}
             disabled={isLoading || !value.trim()}
-            className="self-end m-1.5 px-3 py-1.5 text-[11px] font-mono tracking-[0.15em] uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 shrink-0"
-            style={{
-              borderRadius: 0,
-              border: '1px solid hsl(var(--foreground))',
-              background: 'hsl(var(--foreground))',
-              color: 'hsl(var(--background))',
-            }}
-            onMouseEnter={e => {
-              if (!e.currentTarget.disabled) {
-                e.currentTarget.style.opacity = '0.8';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.opacity = '1';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
           >
-            ◈ SEND
-          </button>
+            Send
+          </Button>
         </div>
       </div>
 
       {/* Footer hints */}
-      <div className="px-4 pb-3 space-y-0.5">
-        <div className="text-[10px] font-mono" style={{ color: 'hsl(var(--muted-foreground) / 0.6)' }}>
-          [I] ENTER TO SEND · SHIFT-ENTER FOR NEWLINE · RESPONSES SIMULATED FROM {persona.name.toUpperCase()}'S PROFILE
+      <div className="space-y-0.5 px-4 pb-3">
+        <div className="font-mono text-[10px] text-muted-foreground/70">
+          [I] Enter to send · Shift-Enter for newline · Responses simulated from {persona.name}'s profile
         </div>
-        <div className="text-[10px] font-mono" style={{ color: 'hsl(var(--muted-foreground) / 0.5)' }}>
-          ☝ RATE REPLIES TO IMPROVE GENERATION
+        <div className="font-mono text-[10px] text-muted-foreground/70">
+          ☝ Rate replies to improve generation
         </div>
       </div>
     </div>

@@ -60,8 +60,9 @@ function setShowTraitPref(val: boolean) {
   } catch {}
 }
 
-export function PersonaChatPage() {
-  const { personaId: personaIdStr } = useParams<{ personaId: string }>();
+export function PersonaChatPage({ embedded = false, personaId: personaIdOverride, onClose }: { embedded?: boolean; personaId?: string; onClose?: () => void } = {}) {
+  const { personaId: routePersonaId } = useParams<{ personaId: string }>();
+  const personaIdStr = personaIdOverride ?? routePersonaId;
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
@@ -69,7 +70,7 @@ export function PersonaChatPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showTrait, setShowTrait] = useState(getShowTrait);
 
-  const { sessions, loadSession, sendMessage, retryMessage, clearSession, setFeedback, toggleTag } =
+  const { sessions, loadSession, sendMessage, retryMessage, setFeedback, toggleTag } =
     usePersonaChatStore();
 
   const [toast, setToast] = useState<string | null>(null);
@@ -126,10 +127,6 @@ export function PersonaChatPage() {
   const handleSend = useCallback((content: string) => {
     sendMessage(personaId, content);
   }, [personaId, sendMessage]);
-
-  const handleRestart = useCallback(async () => {
-    await clearSession(personaId);
-  }, [personaId, clearSession]);
 
   const handleFeedback = useCallback((msgId: number, value: 'up' | 'down' | null) => {
     setFeedback(personaId, msgId, value);
@@ -188,26 +185,19 @@ export function PersonaChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
-      <PersonaChatTopbar persona={persona} session={session} onRestart={handleRestart} />
+    <div className={`flex flex-col overflow-hidden ${embedded ? 'h-full w-full' : 'h-screen w-screen'}`}>
+      {/* The embedded window already has a title bar; a second nav bar here is what made the
+          chat read as a separate application. */}
+      {!embedded && <PersonaChatTopbar persona={persona} onClose={onClose} />}
 
       {/* Error toast */}
       {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 z-50 font-mono text-[11px] tracking-[0.12em] px-4 py-2 flex items-center gap-3"
-          style={{
-            transform: 'translateX(-50%)',
-            borderRadius: 0,
-            background: '#c0392b',
-            color: '#fff',
-            border: '1px solid #922b21',
-            boxShadow: '2px 2px 0 rgba(0,0,0,0.3)',
-          }}
-        >
+        <div className="fixed bottom-6 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-3 border-2 border-destructive bg-destructive px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-destructive-foreground shadow-[5px_5px_0_hsl(var(--foreground)/0.5)]">
           <span>✕ {toast}</span>
           <button
             onClick={() => setToast(null)}
-            className="opacity-70 hover:opacity-100 transition-opacity"
+            aria-label="Dismiss error"
+            className="opacity-70 transition-opacity hover:opacity-100"
           >
             ×
           </button>

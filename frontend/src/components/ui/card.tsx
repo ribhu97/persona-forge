@@ -10,7 +10,7 @@ const Card = React.forwardRef<
     ref={ref}
     className={cn(
       "border bg-card text-card-foreground relative",
-      "before:absolute before:-top-[1px] before:-left-[1px] before:w-6 before:h-6 before:border-t-2 before:border-l-2 before:border-black dark:before:border-white",
+      "before:absolute before:-top-[1px] before:-left-[1px] before:w-6 before:h-6 before:border-t-2 before:border-l-2 before:border-foreground",
       className
     )}
     {...props}

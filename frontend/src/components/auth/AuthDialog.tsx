@@ -122,8 +122,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     return (
         <Dialog.Root open={open} onOpenChange={handleOpenChange}>
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-50" />
-                <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-[80]" />
+                <Dialog.Content className="fixed left-[50%] top-[50%] z-[81] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border-2 border-border bg-card p-6 text-foreground shadow-[8px_8px_0_hsl(var(--foreground)/0.8)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-none">
                     <div className="flex flex-col space-y-1.5 text-center sm:text-left">
                         <Dialog.Title className="text-lg font-semibold leading-none tracking-tight">
                             {mode === 'login' ? 'Welcome Back' : 'Create Account'}
@@ -139,7 +139,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {error && (
-                            <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
+                            <div className="p-3 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-none">
                                 {error}
                             </div>
                         )}
@@ -197,7 +197,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                 <span className="w-full border-t" />
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white px-2 text-muted-foreground font-mono tracking-widest">
+                                <span className="bg-card px-2 text-muted-foreground font-mono tracking-widest">
                                     Or continue with
                                 </span>
                             </div>
@@ -240,7 +240,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                         </div>
                     </form>
 
-                    <Dialog.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                    <Dialog.Close className="absolute right-4 top-4 rounded-none opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </Dialog.Close>

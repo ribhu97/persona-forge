@@ -115,8 +115,8 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-50" />
-                <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-[80]" />
+                <Dialog.Content className="fixed left-[50%] top-[50%] z-[81] grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border-2 border-border bg-card p-6 text-foreground shadow-[8px_8px_0_hsl(var(--foreground)/0.8)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-none">
                     <div className="flex flex-col space-y-1.5 text-center sm:text-left">
                         <Dialog.Title className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2">
                             <Download className="h-5 w-5" />
@@ -135,18 +135,18 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                         <div className="space-y-4">
                             {/* Rate Limit Banner - Prominent for free users who can't export */}
                             {!canExport && !isAdmin && (
-                                <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+                                <div className="rounded-none border-2 border-amber-500/50 bg-amber-950/30 p-4">
                                     <div className="flex items-start gap-3">
-                                        <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                                        <AlertTriangle className="h-6 w-6 text-amber-400 flex-shrink-0 mt-0.5" />
                                         <div className="space-y-1">
-                                            <h4 className="font-semibold text-amber-800">
+                                            <h4 className="font-semibold text-amber-200">
                                                 FREE ACCOUNT LIMIT REACHED
                                             </h4>
-                                            <p className="text-sm text-amber-700">
+                                            <p className="text-sm text-amber-300">
                                                 You have <span className="font-bold">0 exports</span> remaining this month.
                                             </p>
                                             {exportStatus?.next_export_available && (
-                                                <p className="text-sm text-amber-700">
+                                                <p className="text-sm text-amber-300">
                                                     Next export available: <span className="font-semibold">
                                                         {formatNextAvailableDate(exportStatus.next_export_available)}
                                                     </span>
@@ -155,7 +155,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                             <div className="pt-2">
                                                 <button
                                                     onClick={() => navigate('/pricing')}
-                                                    className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
+                                                    className="text-sm font-medium text-amber-200 hover:text-amber-100 underline underline-offset-2"
                                                 >
                                                     Upgrade to unlock unlimited exports →
                                                 </button>
@@ -168,10 +168,10 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                             {/* Status badge for users who can export */}
                             {canExport && (
                                 <div className={cn(
-                                    "rounded-lg p-3 text-sm",
+                                    "rounded-none p-3 text-sm",
                                     isAdmin
-                                        ? "bg-purple-50 border border-purple-200 text-purple-700"
-                                        : "bg-green-50 border border-green-200 text-green-700"
+                                        ? "bg-purple-950/40 border border-purple-800 text-purple-200"
+                                        : "bg-green-950/40 border border-green-800 text-green-200"
                                 )}>
                                     {isAdmin ? (
                                         <span className="flex items-center gap-2">
@@ -196,22 +196,22 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                         onClick={() => setSelectedFormat('pdf')}
                                         disabled={!canExport}
                                         className={cn(
-                                            "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all duration-150",
+                                            "flex flex-col items-center gap-2 p-4 rounded-none border-2 transition-all duration-150",
                                             selectedFormat === 'pdf'
-                                                ? "border-gray-900 bg-gray-50 shadow-sm"
-                                                : "border-gray-200 hover:border-gray-400 hover:bg-gray-50",
-                                            !canExport && "opacity-50 cursor-not-allowed hover:border-gray-200 hover:bg-white"
+                                                ? "border-foreground bg-muted shadow-[3px_3px_0_hsl(var(--foreground)/0.6)]"
+                                                : "border-border hover:border-foreground hover:bg-muted",
+                                            !canExport && "opacity-50 cursor-not-allowed hover:border-border hover:bg-card"
                                         )}
                                     >
                                         <FileText className={cn(
                                             "h-8 w-8 transition-colors",
-                                            selectedFormat === 'pdf' ? "text-gray-900" : "text-gray-400"
+                                            selectedFormat === 'pdf' ? "text-foreground" : "text-muted-foreground"
                                         )} />
                                         <span className={cn(
                                             "font-semibold transition-colors",
-                                            selectedFormat === 'pdf' ? "text-gray-900" : "text-gray-500"
+                                            selectedFormat === 'pdf' ? "text-foreground" : "text-muted-foreground"
                                         )}>PDF</span>
-                                        <span className="text-xs text-gray-400">Formatted document</span>
+                                        <span className="text-xs text-muted-foreground">Formatted document</span>
                                     </button>
 
                                     <button
@@ -219,36 +219,36 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                         onClick={() => setSelectedFormat('json')}
                                         disabled={!canExport}
                                         className={cn(
-                                            "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all duration-150",
+                                            "flex flex-col items-center gap-2 p-4 rounded-none border-2 transition-all duration-150",
                                             selectedFormat === 'json'
-                                                ? "border-gray-900 bg-gray-50 shadow-sm"
-                                                : "border-gray-200 hover:border-gray-400 hover:bg-gray-50",
-                                            !canExport && "opacity-50 cursor-not-allowed hover:border-gray-200 hover:bg-white"
+                                                ? "border-foreground bg-muted shadow-[3px_3px_0_hsl(var(--foreground)/0.6)]"
+                                                : "border-border hover:border-foreground hover:bg-muted",
+                                            !canExport && "opacity-50 cursor-not-allowed hover:border-border hover:bg-card"
                                         )}
                                     >
                                         <FileJson className={cn(
                                             "h-8 w-8 transition-colors",
-                                            selectedFormat === 'json' ? "text-gray-900" : "text-gray-400"
+                                            selectedFormat === 'json' ? "text-foreground" : "text-muted-foreground"
                                         )} />
                                         <span className={cn(
                                             "font-semibold transition-colors",
-                                            selectedFormat === 'json' ? "text-gray-900" : "text-gray-500"
+                                            selectedFormat === 'json' ? "text-foreground" : "text-muted-foreground"
                                         )}>JSON</span>
-                                        <span className="text-xs text-gray-400">Raw data</span>
+                                        <span className="text-xs text-muted-foreground">Raw data</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Error Message */}
                             {error && (
-                                <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
+                                <div className="p-3 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-none">
                                     {error}
                                 </div>
                             )}
 
                             {/* Success Message */}
                             {success && (
-                                <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-md flex items-center gap-2">
+                                <div className="p-3 text-sm text-green-300 bg-green-950/40 border border-green-800 rounded-none flex items-center gap-2">
                                     <Check className="h-4 w-4" />
                                     Export successful! Your download should start automatically.
                                 </div>
@@ -275,7 +275,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                         </div>
                     )}
 
-                    <Dialog.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                    <Dialog.Close className="absolute right-4 top-4 rounded-none opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </Dialog.Close>
