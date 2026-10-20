@@ -101,12 +101,47 @@ function storageKey(conversationId: number | null) {
   return `personaforge-canvas-v1:${conversationId ?? 'new'}`;
 }
 
+/** Returned whenever stored state is missing or unusable. Never mutated — every update spreads. */
+const EMPTY_BOARD: BoardState = { positions: {}, viewport: { x: 0, y: 0, zoom: 1 } };
+
+function isPoint(value: unknown): value is Point {
+  if (!value || typeof value !== 'object') return false;
+  if (!('x' in value) || !('y' in value)) return false;
+  return typeof value.x === 'number' && Number.isFinite(value.x)
+    && typeof value.y === 'number' && Number.isFinite(value.y);
+}
+
+/**
+ * The board is persisted as JSON, so it can come back as `{}`, `null`, or a shape written by an
+ * older build. The canvas is the whole surface, so an unvalidated read here is a white screen
+ * until the user clears storage — validate every field and fall back to a fresh board.
+ */
 function readLayout(key: string): BoardState {
   try {
     const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-  } catch { /* use a fresh board when stored state is unavailable */ }
-  return { positions: {}, viewport: { x: 0, y: 0, zoom: 1 } };
+    if (!saved) return EMPTY_BOARD;
+    const parsed: unknown = JSON.parse(saved);
+    if (!parsed || typeof parsed !== 'object') return EMPTY_BOARD;
+    if (!('viewport' in parsed) || !('positions' in parsed)) return EMPTY_BOARD;
+
+    const { viewport, positions } = parsed;
+    if (!viewport || typeof viewport !== 'object') return EMPTY_BOARD;
+    if (!('x' in viewport) || !('y' in viewport) || !('zoom' in viewport)) return EMPTY_BOARD;
+
+    const { x, y, zoom } = viewport;
+    if (typeof x !== 'number' || !Number.isFinite(x)) return EMPTY_BOARD;
+    if (typeof y !== 'number' || !Number.isFinite(y)) return EMPTY_BOARD;
+    if (typeof zoom !== 'number' || !Number.isFinite(zoom) || zoom <= 0) return EMPTY_BOARD;
+
+    if (!positions || typeof positions !== 'object') return EMPTY_BOARD;
+    const usablePositions: Record<string, Point> = {};
+    for (const [id, point] of Object.entries(positions)) {
+      if (isPoint(point)) usablePositions[id] = point;
+    }
+    return { positions: usablePositions, viewport: { x, y, zoom } };
+  } catch {
+    return EMPTY_BOARD;
+  }
 }
 
 /**
@@ -304,7 +339,7 @@ export function CanvasWorkspace({ conversationId, personas, prompt, messages, is
     <div className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       <div
         ref={viewportRef}
-        className={cn('absolute inset-0 overflow-hidden touch-none bg-background', draggingCard ? 'cursor-grabbing' : 'cursor-grab')}
+        className={cn('absolute inset-0 overflow-hidden bg-background', draggingCard ? 'cursor-grabbing' : 'cursor-grab')}
         onPointerDown={event => {
           if (!(event.target as HTMLElement).closest('[data-canvas-interactive]')) beginPointer(event, 'pan');
         }}
@@ -312,7 +347,7 @@ export function CanvasWorkspace({ conversationId, personas, prompt, messages, is
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
       >
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden bg-background">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 touch-none overflow-hidden bg-background">
           {/* Oversized by 15% a side so the parallax translate never exposes an edge. */}
           <div
             className="absolute -inset-[15%]"
@@ -465,7 +500,11 @@ export function CanvasWorkspace({ conversationId, personas, prompt, messages, is
             {versions.length > 1 && <select className="mt-1 bg-transparent text-xs text-muted-foreground outline-none" value={selectedVersionId ?? ''} onChange={event => onSelectVersion(event.target.value)}>{versions.map((version, index) => <option key={version.id} value={version.id}>Version {index + 1}</option>)}</select>}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => onChatPersona(selectedPersona)} className="h-8 rounded-none"><MessageCircle className="mr-2 h-4 w-4" />Chat</Button>
+            {/* Duplicated personas carry a synthetic `persona-<ts>-duplicate` id, which has no
+                backend record — the interview would load a NaN persona id and error out. */}
+            {Number.isFinite(Number(selectedPersona.id)) && (
+              <Button variant="outline" size="sm" onClick={() => onChatPersona(selectedPersona)} className="h-8 rounded-none"><MessageCircle className="mr-2 h-4 w-4" />Chat</Button>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedId(null)} aria-label="Close inspector"><X className="h-4 w-4" /></Button>
           </div>
         </div>
