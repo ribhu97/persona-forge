@@ -112,7 +112,7 @@ export function InlineEditor({
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevent blur
             onClick={handleSave}
-            className="p-1 hover:bg-green-100 hover:text-green-700 rounded-none transition-colors"
+            className="p-1 text-signal-goal transition-colors hover:bg-signal-goal/10 rounded-none"
             title="Save"
           >
             <Check className="h-3 w-3" />
@@ -120,7 +120,7 @@ export function InlineEditor({
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevent blur
             onClick={handleCancel}
-            className="p-1 hover:bg-red-100 hover:text-red-700 rounded-none transition-colors"
+            className="p-1 text-destructive transition-colors hover:bg-destructive/10 rounded-none"
             title="Cancel"
           >
             <X className="h-3 w-3" />
@@ -222,7 +222,7 @@ export function ArrayEditor({
           {!disabled && (
             <button
               onClick={() => handleRemoveItem(index)}
-              className="opacity-0 group-hover:opacity-50 hover:opacity-100 p-0.5 hover:bg-red-100 hover:text-red-700 rounded-none transition-all text-xs"
+              className="p-0.5 text-destructive opacity-0 transition-all hover:bg-destructive/10 hover:opacity-100 group-hover:opacity-50 rounded-none text-xs"
               title="Remove item"
             >
               <X className="h-3 w-3" />
@@ -248,7 +248,7 @@ export function ArrayEditor({
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleAddItem}
-                className="p-1 hover:bg-green-100 hover:text-green-700 rounded-none transition-colors"
+                className="p-1 text-signal-goal transition-colors hover:bg-signal-goal/10 rounded-none"
               >
                 <Check className="h-3 w-3" />
               </button>

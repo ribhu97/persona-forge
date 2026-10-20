@@ -135,11 +135,11 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                         <div className="space-y-4">
                             {/* Rate Limit Banner - Prominent for free users who can't export */}
                             {!canExport && !isAdmin && (
-                                <div className="rounded-none border-2 border-amber-500/50 bg-amber-950/30 p-4">
+                                <div className="rounded-none border-2 border-signal-mood/50 bg-signal-mood/10 p-4">
                                     <div className="flex items-start gap-3">
-                                        <AlertTriangle className="h-6 w-6 text-amber-400 flex-shrink-0 mt-0.5" />
+                                        <AlertTriangle className="h-6 w-6 text-signal-mood flex-shrink-0 mt-0.5" />
                                         <div className="space-y-1">
-                                            <h4 className="font-semibold text-amber-200">
+                                            <h4 className="font-semibold text-signal-mood">
                                                 FREE ACCOUNT LIMIT REACHED
                                             </h4>
                                             <p className="text-sm text-amber-300">
@@ -155,7 +155,7 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                             <div className="pt-2">
                                                 <button
                                                     onClick={() => navigate('/pricing')}
-                                                    className="text-sm font-medium text-amber-200 hover:text-amber-100 underline underline-offset-2"
+                                                    className="text-sm font-medium text-signal-mood underline underline-offset-2 hover:opacity-80"
                                                 >
                                                     Upgrade to unlock unlimited exports →
                                                 </button>
@@ -170,8 +170,8 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
                                 <div className={cn(
                                     "rounded-none p-3 text-sm",
                                     isAdmin
-                                        ? "bg-purple-950/40 border border-purple-800 text-purple-200"
-                                        : "bg-green-950/40 border border-green-800 text-green-200"
+                                        ? "border-2 border-status-secondary/50 bg-status-secondary/10 text-status-secondary"
+                                        : "border-2 border-signal-goal/50 bg-signal-goal/10 text-signal-goal"
                                 )}>
                                     {isAdmin ? (
                                         <span className="flex items-center gap-2">
@@ -241,14 +241,14 @@ export function ExportDialog({ open, onOpenChange, personas }: ExportDialogProps
 
                             {/* Error Message */}
                             {error && (
-                                <div className="p-3 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-none">
+                                <div className="border-2 border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
                                     {error}
                                 </div>
                             )}
 
                             {/* Success Message */}
                             {success && (
-                                <div className="p-3 text-sm text-green-300 bg-green-950/40 border border-green-800 rounded-none flex items-center gap-2">
+                                <div className="flex items-center gap-2 border-2 border-signal-goal/50 bg-signal-goal/10 p-3 text-sm text-signal-goal">
                                     <Check className="h-4 w-4" />
                                     Export successful! Your download should start automatically.
                                 </div>

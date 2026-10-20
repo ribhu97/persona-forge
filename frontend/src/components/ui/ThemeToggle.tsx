@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useThemeStore } from '@/stores/themeStore';
@@ -7,6 +8,14 @@ export function ThemeToggle() {
   const theme = useThemeStore(state => state.theme);
   const toggleTheme = useThemeStore(state => state.toggleTheme);
   const isDark = theme === 'dark';
+
+  // The store resolves the theme at module scope, which reads 'light' during SSG pre-render and
+  // the real preference in the browser. Rendering the icon before mount would therefore mismatch
+  // on hydration for every dark-theme user on the pre-rendered route. An inert placeholder of the
+  // same size keeps the server and first client render identical.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <span className="h-8 w-8" aria-hidden="true" />;
 
   return (
     <Button

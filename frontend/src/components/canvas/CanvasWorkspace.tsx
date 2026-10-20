@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { PersonaCard } from '@/components/persona/PersonaCard';
 import { ExportDialog } from '@/components/persona/ExportDialog';
 import { cn } from '@/lib/utils';
-import type { Message, Persona, PersonaVersion } from '@/types';
+import type { GenerationMode, Message, Persona, PersonaVersion, ProcessedFile } from '@/types';
 import { SearchInterface } from '@/components/search/SearchInterface';
 import { FaceGrid } from '@/components/canvas/FaceGrid';
 
@@ -20,7 +20,7 @@ interface Props {
   isLoading: boolean;
   terminalOpen: boolean;
   onTerminalOpenChange: (open: boolean) => void;
-  onRefine: (data: { text: string; mode: any; files: any[]; fileId?: string }) => Promise<void>;
+  onRefine: (data: { text: string; mode: GenerationMode; files: ProcessedFile[]; fileId?: string }) => Promise<boolean>;
   sidebar: (onSelectIdea: () => void) => React.ReactNode;
   chromeRight?: React.ReactNode;
   onUpdatePersona: (id: string, updates: Partial<Persona>) => void;
@@ -285,6 +285,21 @@ export function CanvasWorkspace({ conversationId, personas, prompt, messages, is
 
   const resetBoard = () => setBoard(current => ({ ...current, viewport: { x: 0, y: 0, zoom: 1 } }));
 
+  // React attaches wheel listeners at the root as passive, so `preventDefault()` in an onWheel
+  // prop is a no-op: Ctrl/Cmd+scroll and trackpad pinch would zoom the page and the canvas at
+  // once. A native listener with { passive: false } is the only way to claim the gesture.
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      changeZoom(event.deltaY < 0 ? 0.08 : -0.08, { x: event.clientX, y: event.clientY });
+    };
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, [changeZoom]);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       <div
@@ -296,7 +311,6 @@ export function CanvasWorkspace({ conversationId, personas, prompt, messages, is
         onPointerMove={movePointer}
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
-        onWheel={event => { if (event.ctrlKey || event.metaKey) { event.preventDefault(); changeZoom(event.deltaY < 0 ? 0.08 : -0.08, { x: event.clientX, y: event.clientY }); } }}
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden bg-background">
           {/* Oversized by 15% a side so the parallax translate never exposes an edge. */}

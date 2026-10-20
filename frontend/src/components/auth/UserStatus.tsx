@@ -55,7 +55,7 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
                                 </span>
                             )}
                             {user?.account_type === AccountType.PRO && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-none border border-amber-200">
+                                <span className="border border-signal-mood/40 bg-signal-mood/10 px-1.5 py-0.5 text-[10px] font-bold text-signal-mood">
                                     PRO
                                 </span>
                             )}

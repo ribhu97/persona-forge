@@ -19,7 +19,8 @@ interface SearchData {
 }
 
 interface SearchInterfaceProps {
-  onSubmit: (data: SearchData) => Promise<void>;
+  /** Resolves true when the prompt was accepted; the composer keeps the text otherwise. */
+  onSubmit: (data: SearchData) => Promise<boolean>;
   isLoading: boolean;
   className?: string;
   /**
@@ -106,12 +107,14 @@ export function SearchInterface({ onSubmit, isLoading, className, variant = 'pan
 
     if (!input.trim() || isLoading) return;
 
-    await onSubmit({
+    const accepted = await onSubmit({
       text: input.trim().slice(0, MAX_CHARS),
       mode,
       files,
       fileId: attachedFileId ?? undefined,
     });
+    // A bail-out (login prompt) or a failed send must not discard what the user typed.
+    if (!accepted) return;
     setInput('');
     setAttachedFileId(null);
     handleFileRemoved();

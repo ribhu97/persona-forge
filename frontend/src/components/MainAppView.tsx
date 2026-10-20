@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProgress';
+import { CanvasErrorBanner } from '@/components/canvas/CanvasErrorBanner';
 
 // Homepage-only SEO. Lives here (not in index.html) because vite-react-ssg copies the
 // index.html <head> onto every pre-rendered page — a canonical there would leak onto
@@ -121,6 +122,9 @@ export function MainAppView() {
     currentConversationId,
     isLoading,
     error,
+    errorType,
+    retryMessage,
+    clearError,
   } = useChatStore();
   const { isAuthenticated } = useAuthStore();
   const [versions, setVersions] = useState<PersonaVersion[]>([]);
@@ -168,8 +172,9 @@ export function MainAppView() {
     setPersonas(selected.personas);
   }, [versions, selectedVersionId, setPersonas]);
 
-  const handleSearch = async (data: { text: string; mode: GenerationMode; files: ProcessedFile[]; fileId?: string }) => {
-    if (!isAuthenticated) { onLogin(); return; }
+  /** Returns whether the prompt was accepted, so the composer can keep the user's text on a bail-out. */
+  const handleSearch = async (data: { text: string; mode: GenerationMode; files: ProcessedFile[]; fileId?: string }): Promise<boolean> => {
+    if (!isAuthenticated) { onLogin(); return false; }
     setTerminalOpen(true);
     try {
       if (!useChatStore.getState().currentConversationId) await createConversation(data.text);
@@ -228,7 +233,7 @@ export function MainAppView() {
           if (isAxiosError(err) && err.response?.status === 402) {
             setThinkHardProgress(null);
             navigate('/pricing');
-            return;
+            return false;
           }
           throw err;
         }
@@ -239,7 +244,9 @@ export function MainAppView() {
     } catch (err) {
       console.error('Failed to generate personas:', err);
       setThinkHardProgress(null);
+      return false;
     }
+    return true;
   };
 
   const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
@@ -376,7 +383,16 @@ export function MainAppView() {
       selectedVersionId={selectedVersionId}
       onSelectVersion={setSelectedVersionId}
     />
-    {error && <div className="absolute bottom-20 left-1/2 z-[70] max-w-lg -translate-x-1/2 border-2 border-red-800 bg-red-950/70 px-4 py-3 text-sm text-red-200 shadow-[5px_5px_0_hsl(var(--foreground)/0.7)]">{error}</div>}
+    {error && <div className="absolute bottom-20 left-1/2 z-[70] w-[min(560px,calc(100vw-2rem))] -translate-x-1/2">
+      <CanvasErrorBanner
+        error={error}
+        errorType={errorType}
+        onRetry={retryMessage}
+        onUpgrade={() => navigate('/pricing')}
+        onDismiss={clearError}
+        isRetrying={isLoading}
+      />
+    </div>}
     {/* Think Hard reports stage progress here rather than in a second panel: the canvas is the
         whole surface now, and the terminal already shows the quick-mode spinner. */}
     {thinkHardProgress && <div className="absolute bottom-20 left-1/2 z-[65] w-[min(520px,calc(100vw-2rem))] -translate-x-1/2">

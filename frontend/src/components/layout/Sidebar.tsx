@@ -56,7 +56,7 @@ export function Sidebar({ className, onLoginClick, onSelectIdea }: SidebarProps)
               variant="ghost"
               size="icon"
               aria-label="Delete idea"
-              className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
+              className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-destructive opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10"
               onClick={event => {
                 event.stopPropagation();
                 if (confirm('Delete this idea and its history?')) deleteConversation(idea.id);

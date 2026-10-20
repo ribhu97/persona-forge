@@ -139,7 +139,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {error && (
-                            <div className="p-3 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-none">
+                            <div className="border-2 border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
                                 {error}
                             </div>
                         )}
