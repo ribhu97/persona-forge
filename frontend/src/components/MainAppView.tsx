@@ -1,23 +1,25 @@
-import { SearchInterface } from '@/components/search/SearchInterface';
-import { PersonaPanel } from '@/components/persona/PersonaPanel';
-import { ResponsiveLayout } from '@/components/layout/SplitLayout';
-import { usePersonaStore } from '@/stores/personaStore';
-import { useAuthStore } from '@/stores/authStore';
-import type { Persona, BackendPersona, PersonaVersion, ThinkHardProgress } from '@/types';
-import { useState, useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
-import { UserStatus } from '@/components/auth/UserStatus';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { personaAPI, jobsAPI } from '@/lib/api';
-import { useAppContext } from '@/App';
-import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProgress';
-
-import { ChatInterface } from '@/components/chat/ChatInterface';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { useChatStore } from '@/stores/chatStore';
+import { Grip, X } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import { isAxiosError } from 'axios';
+import type { BackendPersona, GenerationMode, Persona, PersonaVersion, ProcessedFile, ThinkHardProgress } from '@/types';
+import { useAppContext } from '@/App';
+import { useAuthStore } from '@/stores/authStore';
+import { useChatStore } from '@/stores/chatStore';
+import { usePersonaStore } from '@/stores/personaStore';
+import { personaAPI, jobsAPI } from '@/lib/api';
+import { SearchInterface } from '@/components/search/SearchInterface';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { CanvasWorkspace } from '@/components/canvas/CanvasWorkspace';
+import { PersonaChatPage } from '@/components/personaChat/PersonaChatPage';
+import { PersonaChatSessionControls } from '@/components/personaChat/PersonaChatSessionControls';
+import { UserStatus } from '@/components/auth/UserStatus';
+import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ThinkHardProgressView, parseJobEvent } from '@/components/ThinkHardProgress';
+import { CanvasErrorBanner } from '@/components/canvas/CanvasErrorBanner';
 
 // Homepage-only SEO. Lives here (not in index.html) because vite-react-ssg copies the
 // index.html <head> onto every pre-rendered page — a canonical there would leak onto
@@ -58,37 +60,83 @@ const HOME_JSON_LD = {
   },
 };
 
+function convertPersona(p: BackendPersona): Persona {
+  const strings = (items: unknown, key: string): string[] => Array.isArray(items)
+    ? items.map(item => typeof item === 'string' ? item : item && typeof item === 'object' && key in item ? String((item as Record<string, unknown>)[key]) : '').filter(Boolean)
+    : [];
+  return {
+    id: String(p.id), name: p.name, status: p.status, role: p.role, tech_comfort: p.tech_comfort,
+    scenario_context: p.scenario_context || '',
+    demographics: { age: String(p.demographics?.age || ''), location: String(p.demographics?.location || ''), education: String(p.demographics?.education || ''), industry: String(p.demographics?.industry || '') },
+    goals: strings(p.goals, 'goal_text'), frustrations: strings(p.frustrations, 'frustration_text'),
+    behavioral_patterns: strings(p.behavioral_patterns, 'pattern_text'), influence_networks: strings(p.influence_networks, 'network_text'),
+    recruitment_criteria: strings(p.recruitment_criteria, 'criteria_text'), research_assumptions: strings(p.research_assumptions, 'assumption_text'),
+  };
+}
+
+type ChatGeometry = { x: number; y: number; width: number; height: number };
+
+/** Clearance for the canvas header; the chat window must never sit above it. */
+const CHAT_HEADER_CLEARANCE = 68;
+const CHAT_VIEWPORT_MARGIN = 12;
+const CHAT_MIN_W = 320;
+const CHAT_MIN_H = 280;
+/** How much of the window must stay on screen so the title bar is always reachable. */
+const CHAT_KEEP_VISIBLE = 120;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function defaultChatGeometry(): ChatGeometry {
+  if (typeof window === 'undefined') {
+    return { x: 0, y: CHAT_HEADER_CLEARANCE, width: 900, height: 600 };
+  }
+  const width = clamp(
+    Math.round(window.innerWidth * 0.7),
+    CHAT_MIN_W,
+    Math.max(CHAT_MIN_W, window.innerWidth - CHAT_VIEWPORT_MARGIN),
+  );
+  const height = clamp(
+    Math.round(window.innerHeight * 0.78),
+    CHAT_MIN_H,
+    Math.max(CHAT_MIN_H, window.innerHeight - CHAT_HEADER_CLEARANCE - CHAT_VIEWPORT_MARGIN),
+  );
+  return {
+    x: Math.round((window.innerWidth - width) / 2),
+    y: CHAT_HEADER_CLEARANCE + Math.round((window.innerHeight - CHAT_HEADER_CLEARANCE - CHAT_VIEWPORT_MARGIN - height) / 2),
+    width,
+    height,
+  };
+}
+
 export function MainAppView() {
   const { onLogin } = useAppContext();
-
-  const {
-    personas,
-    setPersonas,
-    updatePersona,
-    deletePersona,
-    addPersona,
-    clearAll,
-  } = usePersonaStore();
-
+  const navigate = useNavigate();
+  const { personas, setPersonas, updatePersona, deletePersona, addPersona, clearAll } = usePersonaStore();
   const {
     createConversation,
     sendMessage,
     selectConversation,
     messages,
     currentConversationId,
-    isLoading: isChatLoading,
-    error: chatError
+    isLoading,
+    error,
+    errorType,
+    retryMessage,
+    clearError,
   } = useChatStore();
-
   const { isAuthenticated } = useAuthStore();
-  const navigate = useNavigate();
-
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [shouldShowSplit, setShouldShowSplit] = useState(false);
-
-  const [personaVersions, setPersonaVersions] = useState<PersonaVersion[]>([]);
+  const [versions, setVersions] = useState<PersonaVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [chatPersona, setChatPersona] = useState<Persona | null>(null);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const prevMessagesLength = useRef(0);
+  /** null = follow the responsive default until the user drags or resizes. */
+  const [chatGeometry, setChatGeometry] = useState<ChatGeometry | null>(null);
+  const [chatInteraction, setChatInteraction] = useState<'drag' | 'resize' | null>(null);
+  const chatDragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const chatResizeRef = useRef<{ x: number; y: number; ow: number; oh: number } | null>(null);
 
   // Think Hard job state
   const [thinkHardProgress, setThinkHardProgress] = useState<ThinkHardProgress | null>(null);
@@ -102,132 +150,45 @@ export function MainAppView() {
   // Sync chat personas to persona store and handle versioning
   useEffect(() => {
     if (currentConversationId && messages.length > 0) {
-      const msgsWithPersonas = messages.filter(m => m.personas && m.personas.length > 0);
-
-      const versions: PersonaVersion[] = msgsWithPersonas.map(m => {
-        const personasList = (m.personas || []) as unknown as BackendPersona[];
-
-        const convertedPersonas: Persona[] = personasList.map((p: any) => {
-          const extractStrings = (arr: any[], key: string) => {
-            if (!Array.isArray(arr)) return [];
-            return arr.map(item => {
-              if (typeof item === 'object' && item !== null && key in item) {
-                return String(item[key]);
-              }
-              if (typeof item === 'string') return item;
-              return '';
-            }).filter(Boolean);
-          };
-
-          return {
-            id: String(p.id),
-            name: p.name,
-            status: p.status,
-            role: p.role,
-            tech_comfort: p.tech_comfort,
-            scenario_context: p.scenario_context || '',
-            demographics: {
-              age: String(p.demographics?.age || ''),
-              location: String(p.demographics?.location || ''),
-              education: String(p.demographics?.education || ''),
-              industry: String(p.demographics?.industry || ''),
-            },
-            goals: extractStrings(p.goals, 'goal_text'),
-            frustrations: extractStrings(p.frustrations, 'frustration_text'),
-            behavioral_patterns: extractStrings(p.behavioral_patterns, 'pattern_text'),
-            influence_networks: extractStrings(p.influence_networks, 'network_text'),
-            recruitment_criteria: extractStrings(p.recruitment_criteria, 'criteria_text'),
-            research_assumptions: extractStrings(p.research_assumptions, 'assumption_text'),
-          };
-        });
-
-        return {
-          id: String(m.id),
-          timestamp: new Date(m.created_at),
-          personas: convertedPersonas
-        };
-      });
-
-      setPersonaVersions(versions);
-
+      const nextVersions: PersonaVersion[] = messages.filter(message => message.personas?.length).map(message => ({
+        id: String(message.id), timestamp: new Date(message.created_at), personas: (message.personas ?? []).map(convertPersona),
+      }));
+      setVersions(nextVersions);
       const hasNewMessages = messages.length > prevMessagesLength.current;
       prevMessagesLength.current = messages.length;
-
-      if (versions.length > 0) {
-        const latestVersionId = versions[versions.length - 1].id;
-        if (hasNewMessages || !selectedVersionId) {
-          setSelectedVersionId(latestVersionId);
-        }
-      } else {
-        setPersonas([]);
-      }
+      if (nextVersions.length) {
+        const latest = nextVersions[nextVersions.length - 1].id;
+        if (hasNewMessages || !selectedVersionId || !nextVersions.some(version => version.id === selectedVersionId)) setSelectedVersionId(latest);
+      } else setPersonas([]);
     } else {
-      setPersonaVersions([]);
+      setVersions([]);
+      setPersonas([]);
     }
-  }, [messages, currentConversationId, setPersonas]);
+  }, [messages, currentConversationId, selectedVersionId, setPersonas]);
 
   useEffect(() => {
-    if (personaVersions.length > 0) {
-      const versionToShow = selectedVersionId
-        ? personaVersions.find(v => v.id === selectedVersionId)
-        : personaVersions[personaVersions.length - 1];
+    if (!versions.length) return;
+    const selected = versions.find(version => version.id === selectedVersionId) ?? versions[versions.length - 1];
+    setPersonas(selected.personas);
+  }, [versions, selectedVersionId, setPersonas]);
 
-      if (versionToShow) {
-        setPersonas(versionToShow.personas);
-      }
-    }
-  }, [selectedVersionId, personaVersions, setPersonas]);
-
-  useEffect(() => {
-    if ((personas.length > 0 || currentConversationId) && !shouldShowSplit) {
-      setShouldShowSplit(true);
-    }
-  }, [personas.length, currentConversationId, shouldShowSplit]);
-
-  const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
-    const originalPersona = personas.find(p => p.id === id);
-    updatePersona(id, updates);
-
-    if (typeof id === 'string' && id.startsWith('persona-')) {
-      return;
-    }
-
+  /** Returns whether the prompt was accepted, so the composer can keep the user's text on a bail-out. */
+  const handleSearch = async (data: { text: string; mode: GenerationMode; files: ProcessedFile[]; fileId?: string }): Promise<boolean> => {
+    if (!isAuthenticated) { onLogin(); return false; }
+    setTerminalOpen(true);
     try {
-      await personaAPI.updatePersona(id, updates);
-    } catch (err) {
-      console.error('Failed to update persona:', err);
-      if (originalPersona) {
-        updatePersona(id, originalPersona);
-      }
-    }
-  };
-
-  const handleClearAll = async () => {
-    setIsTransitioning(true);
-    await new Promise(resolve => setTimeout(resolve, 400));
-    clearAll();
-    setShouldShowSplit(false);
-    setIsTransitioning(false);
-  };
-
-  const handleSearch = async (data: { text: string; mode: any; files: any[]; fileId?: string }) => {
-    if (!isAuthenticated) {
-      onLogin();
-      return;
-    }
-
-    try {
-      const conv = await createConversation(data.text);
+      if (!useChatStore.getState().currentConversationId) await createConversation(data.text);
 
       if (data.mode === 'think_hard') {
         // ── Think Hard: create a job and stream events ──
+        const conversationId = useChatStore.getState().currentConversationId;
+        if (!conversationId) throw new Error('No conversation to attach the job to');
         setThinkHardProgress({ stage: 'queued', message: 'Creating job...', isTerminal: false });
-        setShouldShowSplit(true);
 
         try {
           // One key per user send attempt — backend dedups duplicate submissions
           const idempotencyKey = crypto.randomUUID();
-          const job = await jobsAPI.createJob(conv.id, {
+          const job = await jobsAPI.createJob(conversationId, {
             text: data.text,
             mode: 'think_hard',
             file_id: data.fileId,
@@ -235,11 +196,11 @@ export function MainAppView() {
           });
 
           // Fetch messages to get the pending assistant message
-          await selectConversation(conv.id);
+          await selectConversation(conversationId);
 
           // Subscribe to SSE events
           sseClientRef.current?.close();
-          const sseClient = jobsAPI.streamJobEvents(conv.id, job.id, {
+          const sseClient = jobsAPI.streamJobEvents(conversationId, job.id, {
             onEvent: (event) => {
               if (event.event && event.data) {
                 const progress = parseJobEvent(event.event, event.data);
@@ -248,7 +209,7 @@ export function MainAppView() {
                 if (progress.isTerminal) {
                   // On terminal, fetch messages to get the final personas
                   setTimeout(() => {
-                    selectConversation(conv.id);
+                    selectConversation(conversationId);
                     setThinkHardProgress(null);
                   }, 500);
                   sseClientRef.current?.close();
@@ -266,12 +227,13 @@ export function MainAppView() {
             },
           });
           sseClientRef.current = sseClient;
-        } catch (err: any) {
-          const status = err.response?.status;
-          if (status === 402) {
+        } catch (err) {
+          // 402 means the plan quota is exhausted; every other failure rethrows to the outer
+          // handler. `isAxiosError` narrows `unknown` without an unchecked cast.
+          if (isAxiosError(err) && err.response?.status === 402) {
             setThinkHardProgress(null);
             navigate('/pricing');
-            return;
+            return false;
           }
           throw err;
         }
@@ -279,188 +241,191 @@ export function MainAppView() {
         // ── Quick mode: existing synchronous flow ──
         await sendMessage(data.text, data.fileId);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to generate personas:', err);
       setThinkHardProgress(null);
+      return false;
     }
+    return true;
   };
 
-  const handleDuplicatePersona = (persona: Persona) => {
-    const duplicated: Persona = {
-      ...persona,
-      id: `persona-${Date.now()}-duplicate`,
-      name: `${persona.name} (Copy)`,
-    };
-    addPersona(duplicated);
+  const handleUpdatePersona = async (id: string, updates: Partial<Persona>) => {
+    const original = personas.find(persona => String(persona.id) === id);
+    updatePersona(id, updates);
+    if (id.startsWith('persona-')) return;
+    try { await personaAPI.updatePersona(id, updates); }
+    catch (err) { console.error('Failed to update persona:', err); if (original) updatePersona(id, original); }
   };
 
-  const isInitialState = personas.length === 0 && !currentConversationId;
+  const handleDuplicatePersona = (persona: Persona) => addPersona({ ...persona, id: `persona-${Date.now()}-duplicate`, name: `${persona.name} (Copy)` });
+  const handleClear = () => {
+    useChatStore.getState().clearCurrentConversation();
+    clearAll();
+    setVersions([]);
+    setChatPersona(null);
+    setTerminalOpen(false);
+    setThinkHardProgress(null);
+    sseClientRef.current?.close();
+  };
 
-  const leftPanel = isInitialState ? (
-    <div className="h-full w-full bg-background relative flex flex-col">
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-6">
-        <Link to="/blog">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="terminal-prompt text-muted-foreground hover:text-foreground font-medium"
-          >
-            Blog
-          </Button>
-        </Link>
-        <Link to="/pricing">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="terminal-prompt text-muted-foreground hover:text-foreground font-medium"
-          >
-            Pricing
-          </Button>
-        </Link>
+  const prompt = <SearchInterface onSubmit={handleSearch} isLoading={isLoading} variant="landing" />;
+
+  const floatingSidebar = (onSelectIdea: () => void) => <Sidebar onLoginClick={onLogin} onSelectIdea={() => { setTerminalOpen(false); setChatPersona(null); onSelectIdea(); }} className="!h-full !w-full !border-0" />;
+
+  const chatBox = chatGeometry ?? defaultChatGeometry();
+
+  const handleChatDragStart = (event: React.PointerEvent) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    chatDragRef.current = { x: event.clientX, y: event.clientY, ox: chatBox.x, oy: chatBox.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setChatInteraction('drag');
+  };
+
+  const handleChatDragMove = (event: React.PointerEvent) => {
+    const drag = chatDragRef.current;
+    if (!drag) return;
+    const { width, height } = chatBox;
+    // Keep the title bar and the bottom-right resize handle on screen: the window may hang off
+    // the top-left, but its right and bottom edges stay inside the viewport.
+    const minX = Math.min(CHAT_KEEP_VISIBLE - width, CHAT_VIEWPORT_MARGIN);
+    const minY = Math.min(CHAT_HEADER_CLEARANCE, window.innerHeight - CHAT_VIEWPORT_MARGIN - height);
+    setChatGeometry({
+      ...chatBox,
+      x: clamp(drag.ox + event.clientX - drag.x, minX, Math.max(minX, window.innerWidth - CHAT_VIEWPORT_MARGIN - width)),
+      y: clamp(drag.oy + event.clientY - drag.y, minY, Math.max(minY, window.innerHeight - CHAT_VIEWPORT_MARGIN - height)),
+    });
+  };
+
+  const endChatInteraction = () => {
+    chatDragRef.current = null;
+    chatResizeRef.current = null;
+    setChatInteraction(null);
+  };
+
+  const handleChatResizeStart = (event: React.PointerEvent) => {
+    chatResizeRef.current = { x: event.clientX, y: event.clientY, ow: chatBox.width, oh: chatBox.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setChatInteraction('resize');
+  };
+
+  const handleChatResizeMove = (event: React.PointerEvent) => {
+    const resize = chatResizeRef.current;
+    if (!resize) return;
+    const width = clamp(
+      resize.ow + event.clientX - resize.x,
+      CHAT_MIN_W,
+      Math.max(CHAT_MIN_W, window.innerWidth - 2 * CHAT_VIEWPORT_MARGIN),
+    );
+    const height = clamp(
+      resize.oh + event.clientY - resize.y,
+      CHAT_MIN_H,
+      Math.max(CHAT_MIN_H, window.innerHeight - CHAT_HEADER_CLEARANCE - CHAT_VIEWPORT_MARGIN),
+    );
+    // Growing from the bottom-right corner would run off the edge when the window is already
+    // flush against it, so nudge the window back inside instead of refusing to grow.
+    setChatGeometry({
+      width,
+      height,
+      x: Math.min(chatBox.x, window.innerWidth - CHAT_VIEWPORT_MARGIN - width),
+      y: Math.min(chatBox.y, window.innerHeight - CHAT_VIEWPORT_MARGIN - height),
+    });
+  };
+
+  const chatTarget = chatPersona && personas.find(persona => String(persona.id) === String(chatPersona.id)) || chatPersona;
+
+  return <ErrorBoundary><div className="relative min-h-screen">
+    <Helmet>
+      <link rel="canonical" href={`${SITE_URL}/`} />
+      <meta property="og:title" content="Persona Forge — AI User Persona Generator by Pehloo" />
+      <meta property="og:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+      <meta property="og:url" content={`${SITE_URL}/`} />
+      <meta property="og:type" content="website" />
+      <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="Persona Forge — AI User Persona Generator" />
+      <meta name="twitter:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
+      <meta name="twitter:image" content={`${SITE_URL}/og-image.png`} />
+    </Helmet>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.softwareApplication) }}
+    />
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.organization) }}
+    />
+    <div className="md:hidden absolute top-0 left-0 right-0 z-[60] bg-yellow-50 border-b border-yellow-200 text-yellow-900 text-xs text-center px-4 py-2 font-medium">
+      For the best experience, please use PersonaForge on a desktop.
+    </div>
+    <CanvasWorkspace
+      conversationId={currentConversationId}
+      personas={personas}
+      prompt={prompt}
+      messages={messages}
+      isLoading={isLoading}
+      terminalOpen={terminalOpen}
+      onTerminalOpenChange={setTerminalOpen}
+      onRefine={handleSearch}
+      sidebar={floatingSidebar}
+      chromeRight={<>
+        <Link to="/blog" className="hidden md:block"><Button variant="ghost" size="sm" className="h-8 px-2 text-xs">Blog</Button></Link>
+        <Link to="/pricing" className="hidden md:block"><Button variant="ghost" size="sm" className="h-8 px-2 text-xs">Pricing</Button></Link>
+        <ThemeToggle />
         <UserStatus onLoginClick={onLogin} />
-      </div>
-
-      <div className={cn(
-        "flex-1 flex items-center justify-center transition-all duration-500 ease-out",
-        isTransitioning
-          ? "opacity-0 scale-95 transform"
-          : "opacity-100 scale-100"
-      )}>
-        <SearchInterface
-          onSubmit={handleSearch}
-          isLoading={isChatLoading}
-        />
-      </div>
-
-      {chatError && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 p-4 bg-red-50 border border-red-200 rounded-lg max-w-md animate-in slide-in-from-bottom-4 duration-300 ease-out">
-          <p className="text-red-700 text-sm">{chatError}</p>
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer className="absolute bottom-0 left-0 right-0 py-4 px-6 text-center text-xs text-muted-foreground border-t border-border/50">
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <span>© {new Date().getFullYear()} Pehloo</span>
-          <span className="text-border">·</span>
-          <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
-          <span className="text-border">·</span>
-          <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-          <span className="text-border">·</span>
-          <a href="mailto:ribhu.lahiri@gmail.com" className="hover:text-foreground transition-colors">Contact</a>
-        </div>
-      </footer>
-    </div>
-  ) : (
-    <div className="h-full overflow-hidden bg-background">
-      <ChatInterface />
-    </div>
-  );
-
-  const rightPanel = isInitialState ? null : (
-    <div className="h-full bg-muted/30">
-      <div className={cn(
-        "transition-all duration-500 ease-out",
-        isTransitioning
-          ? "opacity-0 translate-x-4 transform"
-          : "opacity-100 translate-x-0"
-      )}>
-        {thinkHardProgress ? (
-          <div className="h-full flex items-center justify-center p-6">
-            <div className="w-full max-w-md">
-              <ThinkHardProgressView progress={thinkHardProgress} />
-            </div>
-          </div>
-        ) : (
-          <PersonaPanel
-            personas={personas}
-            onUpdatePersona={handleUpdatePersona}
-            onDeletePersona={deletePersona}
-            onDuplicatePersona={handleDuplicatePersona}
-            onClearAll={handleClearAll}
-            isLoading={isChatLoading}
-            isTransitioning={isTransitioning}
-            versions={personaVersions}
-            selectedVersionId={selectedVersionId || undefined}
-            onSelectVersion={setSelectedVersionId}
-          />
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="h-screen w-screen overflow-hidden relative">
-      <Helmet>
-        <link rel="canonical" href={`${SITE_URL}/`} />
-        <meta property="og:title" content="Persona Forge — AI User Persona Generator by Pehloo" />
-        <meta property="og:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
-        <meta property="og:url" content={`${SITE_URL}/`} />
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Persona Forge — AI User Persona Generator" />
-        <meta name="twitter:description" content="Generate detailed AI-powered user personas from any product description in under 10 minutes." />
-        <meta name="twitter:image" content={`${SITE_URL}/og-image.png`} />
-      </Helmet>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.softwareApplication) }}
+      </>}
+      onUpdatePersona={handleUpdatePersona}
+      onDeletePersona={deletePersona}
+      onDuplicatePersona={handleDuplicatePersona}
+      onChatPersona={persona => { setChatPersona(persona); setChatGeometry(null); }}
+      chatOpen={!!chatPersona}
+      onNewIdea={handleClear}
+      versions={versions}
+      selectedVersionId={selectedVersionId}
+      onSelectVersion={setSelectedVersionId}
+    />
+    {error && <div className="absolute bottom-20 left-1/2 z-[70] w-[min(560px,calc(100vw-2rem))] -translate-x-1/2">
+      <CanvasErrorBanner
+        error={error}
+        errorType={errorType}
+        onRetry={retryMessage}
+        onUpgrade={() => navigate('/pricing')}
+        onDismiss={clearError}
+        isRetrying={isLoading}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD.organization) }}
-      />
-      <ErrorBoundary>
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-6">
-          {!isInitialState && (
-            <>
-              <Link to="/blog">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="terminal-prompt text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
-                >
-                  Blog
-                </Button>
-              </Link>
-              <Link to="/pricing">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="terminal-prompt text-muted-foreground hover:text-foreground font-medium bg-background/50 backdrop-blur-sm"
-                >
-                  Pricing
-                </Button>
-              </Link>
-              <UserStatus onLoginClick={onLogin} />
-            </>
-          )}
-        </div>
-
-        {/* Transition Overlay */}
-        {isTransitioning && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center transition-all duration-500 ease-out">
-            <div className="text-center space-y-4">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-sm text-muted-foreground">Preparing new search...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Mobile experience banner */}
-        <div className="md:hidden absolute top-0 left-0 right-0 z-[60] bg-yellow-50 border-b border-yellow-200 text-yellow-900 text-xs text-center px-4 py-2 font-medium">
-          For the best experience, please use PersonaForge on a desktop.
-        </div>
-
-        <ResponsiveLayout
-          sidebar={<Sidebar onLoginClick={onLogin} />}
-          leftPanel={leftPanel}
-          rightPanel={rightPanel}
-          rightPanelLabel="Personas"
-          rightPanelBadge={personas.length}
-        />
-      </ErrorBoundary>
-    </div>
-  );
+    </div>}
+    {/* Think Hard reports stage progress here rather than in a second panel: the canvas is the
+        whole surface now, and the terminal already shows the quick-mode spinner. */}
+    {thinkHardProgress && <div className="absolute bottom-20 left-1/2 z-[65] w-[min(520px,calc(100vw-2rem))] -translate-x-1/2">
+      <ThinkHardProgressView progress={thinkHardProgress} />
+    </div>}
+    {chatTarget && <section
+      className={`absolute z-[60] flex min-h-0 min-w-0 flex-col overflow-hidden border-2 border-border bg-background shadow-[8px_8px_0_hsl(var(--foreground)/0.75)]${chatInteraction ? ' select-none' : ''}`}
+      style={{ left: chatBox.x, top: chatBox.y, width: chatBox.width, height: chatBox.height }}
+      aria-label={`Interview with ${chatTarget.name}`}
+    >
+      <div className="flex h-10 shrink-0 cursor-move touch-none select-none items-center justify-between gap-3 border-b-2 border-border bg-muted/50 px-3 font-mono text-[11px] text-muted-foreground" onPointerDown={handleChatDragStart} onPointerMove={handleChatDragMove} onPointerUp={endChatInteraction} onPointerCancel={endChatInteraction}>
+        <span className="inline-flex min-w-0 items-center gap-2"><Grip className="h-3.5 w-3.5 shrink-0" /><span className="truncate uppercase tracking-[0.12em]">Interview · {chatTarget.name}</span></span>
+        <span className="flex shrink-0 items-center gap-2">
+          <PersonaChatSessionControls personaId={Number(chatTarget.id)} personaName={chatTarget.name} />
+          <button className="p-1 transition-colors hover:bg-accent hover:text-foreground" aria-label="Close chat" onClick={() => setChatPersona(null)}><X className="h-3.5 w-3.5" /></button>
+        </span>
+      </div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden"><PersonaChatPage embedded personaId={String(chatTarget.id)} onClose={() => setChatPersona(null)} /></div>
+      <button
+        type="button"
+        aria-label="Resize chat window"
+        title="Resize"
+        onPointerDown={handleChatResizeStart}
+        onPointerMove={handleChatResizeMove}
+        onPointerUp={endChatInteraction}
+        onPointerCancel={endChatInteraction}
+        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 cursor-se-resize touch-none items-end justify-end p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground"
+      >
+        <svg viewBox="0 0 10 10" className="h-full w-full" aria-hidden="true">
+          <path d="M9 2v7H2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M9 6v3H6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+    </section>}
+  </div></ErrorBoundary>;
 }

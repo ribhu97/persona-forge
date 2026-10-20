@@ -101,7 +101,7 @@ export function InlineEditor({
           onBlur={handleBlur}
           placeholder={placeholder}
           className={cn(
-            "w-full bg-background border border-primary rounded px-2 py-1 text-sm",
+            "w-full bg-background border border-primary rounded-none px-2 py-1 text-sm",
             "focus:outline-none focus:ring-1 focus:ring-primary",
             multiline && "min-h-[3rem] resize-none",
             editClassName
@@ -112,7 +112,7 @@ export function InlineEditor({
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevent blur
             onClick={handleSave}
-            className="p-1 hover:bg-green-100 hover:text-green-700 rounded transition-colors"
+            className="p-1 text-signal-goal transition-colors hover:bg-signal-goal/10 rounded-none"
             title="Save"
           >
             <Check className="h-3 w-3" />
@@ -120,7 +120,7 @@ export function InlineEditor({
           <button
             onMouseDown={(e) => e.preventDefault()} // Prevent blur
             onClick={handleCancel}
-            className="p-1 hover:bg-red-100 hover:text-red-700 rounded transition-colors"
+            className="p-1 text-destructive transition-colors hover:bg-destructive/10 rounded-none"
             title="Cancel"
           >
             <X className="h-3 w-3" />
@@ -134,7 +134,7 @@ export function InlineEditor({
     <div
       onClick={handleStartEdit}
       className={cn(
-        "group relative cursor-pointer rounded px-1 py-0.5 transition-colors",
+        "group relative min-w-0 cursor-pointer break-words rounded-none px-1 py-0.5 transition-colors [overflow-wrap:anywhere]",
         !disabled && "hover:bg-accent/50",
         disabled && "cursor-default",
         value || placeholder ? "" : "min-h-[1.5rem]",
@@ -211,7 +211,7 @@ export function ArrayEditor({
       {values.map((item, index) => (
         <div key={index} className="flex items-start gap-2 group">
           <span className="text-muted-foreground mt-1.5">•</span>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <InlineEditor
               value={item}
               onSave={(newValue) => handleUpdateItem(index, newValue)}
@@ -222,7 +222,7 @@ export function ArrayEditor({
           {!disabled && (
             <button
               onClick={() => handleRemoveItem(index)}
-              className="opacity-0 group-hover:opacity-50 hover:opacity-100 p-0.5 hover:bg-red-100 hover:text-red-700 rounded transition-all text-xs"
+              className="p-0.5 text-destructive opacity-0 transition-all hover:bg-destructive/10 hover:opacity-100 group-hover:opacity-50 rounded-none text-xs"
               title="Remove item"
             >
               <X className="h-3 w-3" />
@@ -242,13 +242,13 @@ export function ArrayEditor({
                 onKeyDown={handleKeyDown}
                 onBlur={() => setTimeout(() => setIsAdding(false), 150)}
                 placeholder={placeholder}
-                className="flex-1 bg-background border border-primary rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="flex-1 bg-background border border-primary rounded-none px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleAddItem}
-                className="p-1 hover:bg-green-100 hover:text-green-700 rounded transition-colors"
+                className="p-1 text-signal-goal transition-colors hover:bg-signal-goal/10 rounded-none"
               >
                 <Check className="h-3 w-3" />
               </button>

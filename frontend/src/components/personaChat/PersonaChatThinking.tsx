@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { Persona } from '@/types';
 import { getThinkingPhrases } from './suggestions';
+import { useEffect, useState } from 'react';
 
 interface Props {
   persona: Persona;
@@ -19,10 +19,10 @@ export function PersonaChatThinking({ persona }: Props) {
 
   return (
     <div className="px-4 py-3">
-      <div className="text-[11px] font-mono tracking-[0.15em] uppercase mb-1" style={{ color: '#d4a017' }}>
+      <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-signal-mood">
         [as {persona.name} — thinking]
       </div>
-      <div className="text-sm italic" style={{ color: '#d4a017' }}>
+      <div className="text-sm italic text-signal-mood">
         {phrases[phraseIdx]}<span className="animate-pulse">█</span>
       </div>
     </div>

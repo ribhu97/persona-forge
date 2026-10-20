@@ -29,6 +29,26 @@
   <link rel="manifest" href="/site.webmanifest">
   <link rel="icon" href="/favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta name="color-scheme" content="light dark" />
+  <!--
+    Theme must be on <html> before first paint: the app is statically pre-rendered, so without
+    this the light theme flashes on every load in dark mode. Keep the key in sync with
+    src/stores/themeStore.ts (THEME_STORAGE_KEY).
+  -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('personaforge-theme');
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var root = document.documentElement;
+        if (theme === 'dark') root.classList.add('dark');
+        root.style.colorScheme = theme;
+      } catch (e) { /* the theme store applies it on hydration */ }
+    })();
+  </script>
   <!--
     NOTE: Page-specific SEO tags (canonical, og:*, twitter:*, JSON-LD) are intentionally
     NOT set here. vite-react-ssg copies this template's <head> onto EVERY pre-rendered

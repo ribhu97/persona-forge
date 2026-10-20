@@ -61,7 +61,7 @@ export function FileUpload({
           onClick={open}
           disabled={disabled}
           className={cn(
-            'flex items-center justify-center h-9 w-9 rounded-lg cursor-pointer',
+            'flex items-center justify-center h-9 w-9 rounded-none cursor-pointer',
             'hover:bg-muted/60 transition-colors duration-200',
             disabled && 'opacity-50 cursor-not-allowed',
           )}
@@ -85,7 +85,7 @@ export function FileUpload({
 
   if (state.status === 'uploading') {
     return (
-      <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-lg text-sm', className)}>
+      <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-none text-sm', className)}>
         <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
         <span className="text-muted-foreground text-xs">Uploading…</span>
       </div>
@@ -94,7 +94,7 @@ export function FileUpload({
 
   if (state.status === 'error') {
     return (
-      <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-lg text-sm max-w-xs', className)}>
+      <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-none text-sm max-w-xs', className)}>
         <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
         <span className="text-destructive text-xs truncate">{state.message}</span>
         <button
@@ -112,7 +112,7 @@ export function FileUpload({
   // Ready — file chip
   const { response } = state;
   return (
-    <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/60 rounded-lg text-sm max-w-xs', className)}>
+    <div className={cn('flex items-center gap-2 px-3 py-1.5 bg-muted/60 rounded-none text-sm max-w-xs', className)}>
       {fileIcon(response.filename)}
       <div className="flex flex-col min-w-0">
         <span className="text-xs font-medium truncate">{response.filename}</span>

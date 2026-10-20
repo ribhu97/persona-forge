@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Persona } from '@/types';
 import type { PersonaChatMessage, TagType } from '@/types/chat';
 import { PersonaChatMessageBubble } from './PersonaChatMessage';
@@ -27,7 +27,6 @@ export function PersonaChatThread({
   onRetry,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [hoveredSuggestion, setHoveredSuggestion] = useState<number | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,72 +35,38 @@ export function PersonaChatThread({
   const suggestions = getInitialSuggestions(persona);
 
   return (
-    <div
-      className="flex-1 overflow-y-auto"
-      style={{
-        background: `
-          repeating-linear-gradient(0deg, transparent, transparent 23px, hsl(var(--border) / 0.35) 23px, hsl(var(--border) / 0.35) 24px),
-          repeating-linear-gradient(90deg, transparent, transparent 23px, hsl(var(--border) / 0.35) 23px, hsl(var(--border) / 0.35) 24px),
-          hsl(var(--background))
-        `,
-      }}
-    >
-      {/* Session lead card */}
-      <div
-        className="mx-4 mt-4 mb-2 p-4"
-        style={{
-          background: 'hsl(var(--background))',
-          borderTop: '1px solid hsl(var(--border))',
-          borderRight: '1px solid hsl(var(--border))',
-          borderBottom: '1px solid hsl(var(--border))',
-          borderLeft: '4px solid #4a7c59',
-          borderRadius: 0,
-        }}
-      >
-        <div className="text-[11px] font-mono tracking-[0.15em] uppercase mb-1" style={{ color: '#4a7c59' }}>
-          CHATTING WITH {persona.name.toUpperCase()}
+    <div className="flex-1 overflow-y-auto bg-background">
+      {/* Session lead card — the green rule is the one signal that this is a synthetic interview. */}
+      <div className="mx-4 mt-4 mb-2 border border-l-4 border-border border-l-signal-goal bg-card p-4">
+        <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.15em] text-signal-goal">
+          Chatting with {persona.name}
         </div>
-        <div className="text-xs font-mono" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {persona.role}
-        </div>
-        <div className="text-[10px] font-mono mt-2" style={{ color: 'hsl(var(--muted-foreground) / 0.6)' }}>
+        <div className="font-mono text-xs text-muted-foreground">{persona.role}</div>
+        <div className="mt-2 font-mono text-[10px] text-muted-foreground/70">
           Synthetic interview — responses are AI-generated from persona hypotheses, not real user data.
         </div>
       </div>
 
       {/* Empty state: suggestion grid */}
       {messages.length === 0 && !isLoading && (
-        <div className="grid grid-cols-2 gap-2 mx-4 mt-4">
+        <div className="mx-4 mt-4 grid grid-cols-2 gap-2">
           {suggestions.map((s, i) => (
             <button
               key={i}
               onClick={() => onSendSuggestion(s.text)}
-              onMouseEnter={() => setHoveredSuggestion(i)}
-              onMouseLeave={() => setHoveredSuggestion(null)}
-              className="text-left p-3 transition-all duration-150"
-              style={{
-                borderRadius: 0,
-                background: 'hsl(var(--background))',
-                border: hoveredSuggestion === i
-                  ? `1px solid hsl(var(--foreground) / 0.6)`
-                  : `1px solid hsl(var(--foreground) / 0.2)`,
-                boxShadow: hoveredSuggestion === i ? '2px 2px 0 hsl(var(--foreground) / 0.15)' : 'none',
-              }}
+              className="border border-foreground/20 bg-background p-3 text-left transition-colors hover:border-foreground/60 hover:bg-accent"
             >
-              <div
-                className="text-[9px] font-mono tracking-[0.15em] uppercase mb-1"
-                style={{ color: s.type === 'friction' ? '#c0392b' : '#4a7c59' }}
-              >
+              <div className={`mb-1 font-mono text-[10px] uppercase tracking-[0.15em] ${s.type === 'friction' ? 'text-destructive' : 'text-signal-goal'}`}>
                 {s.type}
               </div>
-              <div className="text-xs font-mono">{s.text}</div>
+              <div className="font-mono text-xs">{s.text}</div>
             </button>
           ))}
         </div>
       )}
 
       {/* Messages */}
-      <div className="divide-y" style={{ borderColor: 'hsl(var(--border) / 0.3)' }}>
+      <div className="divide-y divide-border/30">
         {messages.map(msg => (
           <PersonaChatMessageBubble
             key={msg.id}
@@ -118,7 +83,7 @@ export function PersonaChatThread({
 
       {/* Thinking indicator */}
       {isLoading && (
-        <div style={{ borderTop: '1px solid hsl(var(--border) / 0.3)' }}>
+        <div className="border-t border-border/30">
           <PersonaChatThinking persona={persona} />
         </div>
       )}

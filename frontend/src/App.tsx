@@ -5,6 +5,7 @@ import { AuthDialog } from '@/components/auth/AuthDialog';
 import { useAuthStore } from '@/stores/authStore';
 import { useChatStore } from '@/stores/chatStore';
 import { usePersonaStore } from '@/stores/personaStore';
+import { applyTheme, useThemeStore } from '@/stores/themeStore';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -33,7 +34,14 @@ export default function AppLayout() {
     checkAuth();
   }, [checkAuth]);
 
-  // Listen for openAuthDialog custom event (fired from ChatInterface, ExportDialog, etc.)
+  // The inline script in index.html paints the correct theme before hydration; this reconciles
+  // the DOM with the store afterwards (and covers the case where that script was blocked).
+  const theme = useThemeStore(state => state.theme);
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  // Listen for openAuthDialog custom event (fired from UserStatus, ExportDialog, etc.)
   useEffect(() => {
     const handleOpenAuthDialog = () => setIsAuthDialogOpen(true);
     window.addEventListener('openAuthDialog', handleOpenAuthDialog);

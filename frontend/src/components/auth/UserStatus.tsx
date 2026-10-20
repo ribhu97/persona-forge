@@ -36,14 +36,12 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                        <UserIcon className="h-4 w-4 text-primary" />
-                    </div>
+                <Button variant="default" size="icon" className="h-8 w-8" aria-label="Account menu">
+                    <UserIcon className="h-4 w-4" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-                className="w-56 bg-white/90 backdrop-blur-sm z-50"
+                className="z-[90] w-56 border-2 border-border bg-popover text-popover-foreground shadow-[5px_5px_0_hsl(var(--foreground)/0.8)]"
                 align="end"
                 forceMount
             >
@@ -52,22 +50,22 @@ export function UserStatus({ onLoginClick }: UserStatusProps) {
                         <div className="flex items-center gap-2">
                             <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
                             {user?.account_type === AccountType.PLUS && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded-full border border-primary/30">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded-none border border-primary/30">
                                     PLUS
                                 </span>
                             )}
                             {user?.account_type === AccountType.PRO && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full border border-amber-200">
+                                <span className="border border-signal-mood/40 bg-signal-mood/10 px-1.5 py-0.5 text-[10px] font-bold text-signal-mood">
                                     PRO
                                 </span>
                             )}
                             {user?.account_type === AccountType.ADMIN && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary text-primary-foreground rounded-full border border-primary/50">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary text-primary-foreground rounded-none border border-primary/50">
                                     ADMIN
                                 </span>
                             )}
                             {user?.account_type === AccountType.FREE && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground rounded-full border border-border">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground rounded-none border border-border">
                                     FREE
                                 </span>
                             )}
