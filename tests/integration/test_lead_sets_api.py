@@ -1,21 +1,23 @@
 """
 Integration tests for the Lead Persona Set HTTP surface.
 
-Covers: service-token gate (wrong token, unset), marketing POST -> 201 +
-link, public GET per state, claim via explicit endpoint (auth'd), and the
-auth-handler claim path (login with lead_token).
+Covers: service-token gate (wrong token, non-ASCII token, unset), marketing
+POST -> 201 + link, public GET per state (incl. no-store), claim via explicit
+endpoint (auth'd, per state), and the auth-handler claim path for all three
+login routes (login / verify-otp / google) plus its failure isolation.
 """
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from src import lead_sets
-from src.auth import create_access_token
+from src.auth import create_access_token, get_password_hash
 from src.main import app
 from src.database import get_session
-from src.models import LeadPersonaSet, User
+from src.models import Conversation, LeadPersonaSet, OneTimePassword, User
 
 from tests.conftest import engine as conftest_engine
 
@@ -175,3 +177,187 @@ class TestExplicitClaim:
         r2 = client.post(f"/api/lead-sets/{lead_set.token}/claim",
                          headers={"Authorization": f"Bearer {t2}"})
         assert r2.status_code == 409
+
+
+class TestServiceTokenHardening:
+    def test_non_ascii_service_token_is_401_not_500(self, monkeypatch):
+        """
+        compare_digest raises TypeError on non-ASCII str; the gate must encode
+        first. Called directly because httpx refuses non-ASCII header values.
+        """
+        from fastapi import HTTPException
+        from src.routers.lead_sets import require_service_token
+
+        monkeypatch.setenv("LEAD_SERVICE_TOKEN", SERVICE_TOKEN)
+        with pytest.raises(HTTPException) as exc:
+            require_service_token(x_service_token="ünïcode-token")
+        assert exc.value.status_code == 401
+
+
+class TestClaimErrorContract:
+    """Distinct codes so the client can render the right state."""
+
+    def _auth_headers(self, session, email="founder@acme.co"):
+        user = User(email=email, is_verified=True)
+        session.add(user)
+        session.commit()
+        return {"Authorization": f"Bearer {create_access_token(data={'sub': email})}"}
+
+    def test_claim_on_generating_returns_425(self, client, session):
+        lead_set = LeadPersonaSet(
+            token=lead_sets.secrets.token_urlsafe(8),
+            product_description="d", state="generating",
+        )
+        session.add(lead_set)
+        session.commit()
+
+        r = client.post(f"/api/lead-sets/{lead_set.token}/claim",
+                        headers=self._auth_headers(session))
+        assert r.status_code == 425
+        assert r.json()["detail"] == {"state": "generating"}
+
+    def test_claim_on_failed_returns_410(self, client, session):
+        lead_set = LeadPersonaSet(
+            token=lead_sets.secrets.token_urlsafe(8),
+            product_description="d", state="failed",
+        )
+        session.add(lead_set)
+        session.commit()
+
+        r = client.post(f"/api/lead-sets/{lead_set.token}/claim",
+                        headers=self._auth_headers(session))
+        assert r.status_code == 410
+        assert r.json()["detail"] == {"state": "failed"}
+
+    def test_claim_on_unknown_token_returns_404(self, client, session):
+        r = client.post("/api/lead-sets/no-such-token/claim",
+                        headers=self._auth_headers(session))
+        assert r.status_code == 404
+
+    def test_public_view_is_not_cached(self, client, session):
+        lead_set = _make_ready_set(session)
+        r = client.get(f"/api/lead-sets/{lead_set.token}")
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == "no-store"
+
+
+class TestAuthHandlerClaim:
+    """The claim fires from every auth route, and never breaks it."""
+
+    def _verified_user(self, session, email, password="hunter2"):
+        user = User(
+            email=email, hashed_password=get_password_hash(password), is_verified=True,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+    def test_login_with_lead_token_claims(self, client, session):
+        lead_set = _make_ready_set(session, email="founder@acme.co")
+        self._verified_user(session, "founder@acme.co")
+
+        r = client.post("/api/auth/login", json={
+            "email": "founder@acme.co", "password": "hunter2",
+            "lead_token": lead_set.token,
+        })
+
+        assert r.status_code == 200
+        conv_id = r.json()["claimed_conversation_id"]
+        assert conv_id is not None
+        session.expire_all()
+        fresh = session.get(LeadPersonaSet, lead_set.id)
+        assert fresh.state == "claimed"
+        assert fresh.claimed_conversation_id == conv_id
+
+    def test_login_without_lead_token_uses_email_fallback(self, client, session):
+        lead_set = _make_ready_set(session, email="founder@acme.co")
+        self._verified_user(session, "founder@acme.co")
+
+        r = client.post("/api/auth/login", json={
+            "email": "founder@acme.co", "password": "hunter2",
+        })
+
+        assert r.status_code == 200
+        assert r.json()["claimed_conversation_id"] is not None
+        session.expire_all()
+        assert session.get(LeadPersonaSet, lead_set.id).state == "claimed"
+
+    def test_verify_otp_with_lead_token_claims(self, client, session):
+        lead_set = _make_ready_set(session, email="newbie@acme.co")
+        user = User(email="newbie@acme.co", hashed_password=get_password_hash("pw"))
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        session.add(OneTimePassword(
+            user_id=user.id, code="123456",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+        ))
+        session.commit()
+
+        r = client.post("/api/auth/verify-otp", json={
+            "email": "newbie@acme.co", "otp": "123456", "lead_token": lead_set.token,
+        })
+
+        assert r.status_code == 200
+        assert r.json()["claimed_conversation_id"] is not None
+        session.expire_all()
+        assert session.get(LeadPersonaSet, lead_set.id).state == "claimed"
+
+    def test_google_login_with_lead_token_claims(self, client, session, monkeypatch):
+        monkeypatch.setattr(
+            "src.routers.auth.verify_google_token",
+            lambda token: {"email": "guser@acme.co", "name": "G User"},
+        )
+        lead_set = _make_ready_set(session, email="guser@acme.co")
+
+        r = client.post("/api/auth/google", json={
+            "token": "fake-google-token", "lead_token": lead_set.token,
+        })
+
+        assert r.status_code == 200
+        assert r.json()["claimed_conversation_id"] is not None
+        session.expire_all()
+        assert session.get(LeadPersonaSet, lead_set.id).state == "claimed"
+
+    def test_claim_failure_does_not_break_login(self, client, session, monkeypatch):
+        """
+        verify-otp consumes the OTP before claiming: an escaping claim error
+        would 500 a request whose OTP is already spent, locking the user out.
+        """
+        self._verified_user(session, "founder@acme.co")
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("claim exploded")
+
+        monkeypatch.setattr(lead_sets, "maybe_claim", boom)
+
+        r = client.post("/api/auth/login", json={
+            "email": "founder@acme.co", "password": "hunter2",
+        })
+
+        assert r.status_code == 200
+        assert r.json()["access_token"]
+        assert r.json()["claimed_conversation_id"] is None
+
+    def test_login_claims_only_the_newest_set(self, client, session):
+        now = datetime.now(timezone.utc)
+        older = _make_ready_set(session, email="founder@acme.co")
+        older.created_at = now - timedelta(minutes=5)
+        session.add(older)
+        session.commit()
+        newer = _make_ready_set(session, email="founder@acme.co")
+        newer.created_at = now - timedelta(minutes=1)
+        session.add(newer)
+        session.commit()
+        self._verified_user(session, "founder@acme.co")
+
+        r = client.post("/api/auth/login", json={
+            "email": "founder@acme.co", "password": "hunter2",
+        })
+
+        assert r.status_code == 200
+        session.expire_all()
+        assert session.get(LeadPersonaSet, newer.id).state == "claimed"
+        assert session.get(LeadPersonaSet, older.id).state == "ready"
+        assert len(session.exec(select(Conversation)).all()) == 1

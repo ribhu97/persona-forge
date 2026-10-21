@@ -7,9 +7,7 @@ from datetime import datetime, timezone, timedelta
 from src.database import get_session
 from sqlalchemy.exc import OperationalError
 from src.models import (
-    User, Conversation, Message, Persona, Demographics, Goal,
-    Frustration, BehavioralPattern, InfluenceNetwork, RecruitmentCriteria, ResearchAssumption,
-    UploadedFile,
+    User, Conversation, Message, UploadedFile,
 )
 from src.schemas import ConversationCreate, ConversationResponse, MessageCreate, MessageResponse, AttachmentInfo, PersonaResponse
 from src.dependencies import get_current_user, effective_account_type

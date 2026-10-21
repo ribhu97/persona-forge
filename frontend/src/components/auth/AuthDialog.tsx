@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/lib/api';
-import { takePendingLeadToken } from '@/lib/leadToken';
+import { takePendingLeadToken, clearPendingLeadToken } from '@/lib/leadToken';
 
 interface AuthDialogProps {
     open: boolean;
@@ -39,6 +39,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
     // Land the Lead directly in their claimed conversation after auth from /p/:token.
     const finishAuth = (claimedConversationId?: number | null) => {
+        // The token has been spent: never let it fire a claim for whoever
+        // signs in next in this tab.
+        clearPendingLeadToken();
         if (claimedConversationId) {
             navigate('/', { state: { selectConversation: claimedConversationId } });
         }
@@ -75,7 +78,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 finishAuth(response.claimed_conversation_id);
             } else {
                 if (signupStep === 'details') {
-                    await authAPI.signup({ email, password, name, lead_token: takePendingLeadToken() });
+                    await authAPI.signup({ email, password, name });
                     setSignupStep('otp');
                 } else {
                     const response = await authAPI.verifyOtp({ email, otp, lead_token: takePendingLeadToken() });

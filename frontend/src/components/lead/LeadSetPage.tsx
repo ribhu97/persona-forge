@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useLoaderData, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sparkles } from 'lucide-react';
@@ -7,7 +8,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CanvasWorkspace } from '@/components/canvas/CanvasWorkspace';
 import { useAuthStore } from '@/stores/authStore';
 import { apiClient } from '@/lib/api';
-import { setPendingLeadToken } from '@/lib/leadToken';
+import { clearPendingLeadToken, setPendingLeadToken } from '@/lib/leadToken';
 import type { Persona } from '@/types';
 
 /**
@@ -67,44 +68,63 @@ function openAuth(token: string | undefined) {
 
 
 
+/** ~2 min of polling at 4s: a set the reconciler has to fail must not spin forever. */
+const MAX_POLLS = 30;
+
 export function LeadSetPage() {
   const loaderData = useLoaderData() as LeadSetView | null;
   const { token } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const [view, setView] = useState<LeadSetView | null>(loaderData);
+  const [pollExhausted, setPollExhausted] = useState(false);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => () => { cancelledRef.current = true; }, []);
+
+  const refetchView = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/lead-sets/${token}`);
+      if (res.ok && !cancelledRef.current) setView(await res.json());
+    } catch { /* keep the current view; the next poll retries */ }
+  }, [token]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-    // Already logged in: fire the explicit claim, then land in the conversation.
+    if (!isAuthenticated || !token) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await apiClient.post(`/lead-sets/${token}/claim`);
-        if (!cancelled && res.data?.conversation_id) {
+        if (cancelled) return;
+        if (res.data?.conversation_id) {
+          clearPendingLeadToken();
           navigate('/', { state: { selectConversation: res.data.conversation_id } });
+          return;
         }
-      } catch {
-        // 409 (claimed by someone else) or 404 — the view below handles it.
-      }
+      } catch { /* 425 not ready / 410 failed / 409 claimed / 404 gone */ }
+      // Refetch either way: the loader's payload may be stale (a claim that
+      // failed because someone else won must show the blurred view, not the
+      // personas we happened to load).
+      await refetchView();
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, token, navigate]);
+  }, [isAuthenticated, token, navigate, refetchView]);
 
   // Poll while generating so the link goes live without a refresh.
   useEffect(() => {
     if (!view || view.state !== 'generating') return;
+    let polls = 0;
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/lead-sets/${token}`);
-        if (res.ok && !cancelledRef.current) setView(await res.json());
-      } catch { /* retry next tick */ }
+      polls += 1;
+      if (polls > MAX_POLLS) {
+        clearInterval(interval);
+        if (!cancelledRef.current) setPollExhausted(true);
+        return;
+      }
+      await refetchView();
     }, 4000);
     return () => clearInterval(interval);
-  }, [view?.state, token]);
-
-  const cancelledRef = useMemo(() => ({ current: false }), []);
-  useEffect(() => () => { cancelledRef.current = true; }, []);
+  }, [view?.state, refetchView]);
 
   const personas = useMemo(
     () => (view?.personas || []).map(toPersona),
@@ -115,6 +135,17 @@ export function LeadSetPage() {
     if (isAuthenticated) return; // logged-in users get the claim effect above
     openAuth(token);
   }, [isAuthenticated, token]);
+
+  // Every state is noindex: the URL is a bearer capability.
+  const withChrome = (node: ReactNode) => (
+    <>
+      <Helmet>
+        <title>Your personas — Persona Forge</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
+      {node}
+    </>
+  );
 
 
   const prompt = (
@@ -130,17 +161,17 @@ export function LeadSetPage() {
   );
 
   if (!view) {
-    return <div className="flex min-h-screen items-center justify-center">
+    return withChrome(<div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
         <h1 className="text-xl font-semibold">Link not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">This persona link is invalid or has expired.</p>
         <Link to="/" className="mt-4 inline-block"><Button variant="outline" size="sm">Go to PersonaForge</Button></Link>
       </div>
-    </div>;
+    </div>);
   }
 
   if (view.state === 'claimed') {
-    return <div className="flex min-h-screen items-center justify-center">
+    return withChrome(<div className="flex min-h-screen items-center justify-center">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">These personas have been claimed</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -152,33 +183,29 @@ export function LeadSetPage() {
           {isAuthenticated && <Button size="sm" onClick={() => navigate('/')}>Go to your workspace</Button>}
         </div>
       </div>
-    </div>;
+    </div>);
   }
 
-  if (view.state === 'failed') {
-    return <div className="flex min-h-screen items-center justify-center">
+  if (view.state === 'failed' || pollExhausted) {
+    return withChrome(<div className="flex min-h-screen items-center justify-center">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">Generation failed</h1>
         <p className="mt-2 text-sm text-muted-foreground">Something went wrong preparing these personas.</p>
         <Link to="/" className="mt-4 inline-block"><Button variant="outline" size="sm">Generate your own</Button></Link>
       </div>
-    </div>;
+    </div>);
   }
 
   if (view.state === 'generating') {
-    return <div className="flex min-h-screen items-center justify-center">
+    return withChrome(<div className="flex min-h-screen items-center justify-center">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">Your personas are being forged…</h1>
         <p className="mt-2 text-sm text-muted-foreground">This usually takes a minute. The page will update automatically.</p>
       </div>
-    </div>;
+    </div>);
   }
 
-  return <div className="relative min-h-screen">
-    <Helmet>
-      <title>Your personas — Persona Forge</title>
-      <meta name="robots" content="noindex" />
-    </Helmet>
+  return withChrome(<div className="relative min-h-screen">
     <CanvasWorkspace
       conversationId={null}
       personas={personas}
@@ -199,5 +226,5 @@ export function LeadSetPage() {
       selectedVersionId={null}
       onSelectVersion={() => {}}
     />
-  </div>;
+  </div>);
 }

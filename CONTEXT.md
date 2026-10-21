@@ -62,15 +62,18 @@ A **Lead Persona Set** is a set of personas generated for a Lead before signup. 
 
 The Lead Persona Set module owns the Lead lifecycle end-to-end behind four verbs: create (marketing, service-token-authenticated), read (public, by token), claim (auth handlers + explicit endpoint), and a generation-capture hook. Interface decisions:
 
-- **Generation capture is eager**: the jobs pipeline's final transaction freezes the raw persona JSON onto the Lead Persona Set row atomically with job success, flipping `state` to `ready` (or `failed`). No lazy capture on the read path.
-- **Claim fires on signup, Google signup, login, AND an authenticated explicit claim endpoint** — the last covers an already-logged-in Lead who clicks the link without any auth event firing. All four are the same one claim function, matched token-first then email-fallback.
-- **The read verb's return value is the complete view model** (full / blurred / generating / failed states decided inside); the HTTP router is a one-line adapter.
+- **Generation capture is eager and self-healing**: the set's `job_id` is written *inside* the job's own creation transaction, so the jobs pipeline's final transaction always finds the set and freezes the raw persona JSON onto it, flipping `state` to `ready` (or `failed`). No lazy capture on the read path. A set whose job never linked, or whose terminal transition missed its hook, is flipped to `failed` by the jobs sweep — a link can never sit in `generating` forever.
+- **A lead job persists no persona rows**: the frozen JSON is the single source of truth. The ghost conversation keeps the job's messages for audit, and the Claim writes the one real copy of the persona rows into the claimer's Conversation.
+- **Claim fires at OTP verify, Google login, password login, AND an authenticated explicit claim endpoint** — the last covers an already-logged-in Lead who clicks the link without any auth event firing. The signup POST itself does not claim: it only mails the OTP. All of these are the same one claim function.
+- **One claim per call, token-first, newest-first fallback**: an explicit token claims exactly that set; otherwise the *newest* `ready` set addressed to the claimer's email is claimed and older sets stay `ready` for a later login. A lost CAS race discards only that one claim (savepoint-scoped), never the caller's transaction.
+- **Claims are exempt from the tier conversation limit**: the conversation is pre-paid by marketing, so a Lead at their free-tier limit still claims. The one-set-per-call rule is what bounds it.
+- **The read verb's return value is the complete view model** (full / blurred / generating / failed states decided inside); the HTTP router is a one-line adapter. The public GET is rate-limited and served `Cache-Control: no-store` — the URL is a bearer capability. The claim endpoint distinguishes states for the client: `425` while generating, `410` when failed, `409` when another user claimed it, `404` for an unknown token.
 - **One table, one link per set**: a `channel` string column records the outreach channel (email/twitter) for attribution. No per-channel link table, no event/analytics machinery — additive later if ever needed.
 - **Marketing identity**: a ghost admin User row (account_type=99, no login use) owns generation jobs; the marketing POST authenticates via a separate env-configured service token (`X-Service-Token`), checked before any user/quota machinery.
 
 ## Claim
 
-**Claiming** converts a Lead Persona Set into the signing-up user's first Conversation: the set's personas and the original product description are seeded into a new Conversation owned by the new user. Claim is one-way and permanent — a claimed set can never be re-claimed. The public link remains alive after Claim, but shows only a fully blurred view of the frozen personas — the content is visible only inside the claimed Conversation.
+**Claiming** converts a Lead Persona Set into the signing-up user's first Conversation: the set's personas and the original product description are seeded into a new Conversation owned by the new user. Claim is one-way and permanent — a claimed set can never be re-claimed, and the frozen set is never edited afterwards. One claim happens per call (the link's set, or the newest set for the claimer's email), so a Lead with several outstanding links claims one per login. The public link remains alive after Claim, but shows only a fully blurred view of the frozen personas — the content is visible only inside the claimed Conversation.
 
 
 ## Subscription tiers

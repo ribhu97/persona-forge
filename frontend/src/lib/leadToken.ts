@@ -17,3 +17,8 @@ export function setPendingLeadToken(token: string | null) {
 export function takePendingLeadToken(): string | null {
   return pendingLeadToken;
 }
+
+/** Drop the pending token once it has been spent (successful claim/auth). */
+export function clearPendingLeadToken() {
+  pendingLeadToken = null;
+}

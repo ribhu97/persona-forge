@@ -24,7 +24,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from sqlmodel import Session, select
 from sqlalchemy import bindparam, text as sa_text
@@ -203,6 +203,7 @@ def create_job(
     account_type: int = 0,
     parent_job_id: Optional[str] = None,
     is_free_retry: bool = False,
+    on_created: Optional[Callable[[Session, GenerationJob], None]] = None,
 ) -> GenerationJob:
     """
     Create a generation job.
@@ -210,6 +211,12 @@ def create_job(
     Before the transaction: resolve and snapshot file context (cap 200KB).
     Then: tier gate, quota reserve, and a single transaction for messages +
     job row + initial event.
+
+    ``on_created(session, job)``, when given, runs inside that transaction
+    right after the job row is staged — the only way for a caller to write
+    state that must be atomic with the job's existence (a worker can claim
+    the job the instant this returns). It receives the job's own session, so
+    it must not touch objects owned by another session.
 
     Raises TierRequired / QuotaExhausted as needed.
     """
@@ -294,6 +301,9 @@ def create_job(
             session.add(job)
 
             emit_event(session, job_id, "state_changed", {"state": STATE_QUEUED, "mode": mode})
+
+            if on_created is not None:
+                on_created(session, job)
 
             conv.last_message_at = now
             session.add(conv)
@@ -489,10 +499,10 @@ def fail_job(
                 msg.pending_generation_job_id = None
                 session.add(msg)
 
-            # Lead Persona Sets: flip a still-generating set to failed in the
-            # same terminal txn (no-op for normal jobs). See src/lead_sets.py.
-            from src import lead_sets
-            lead_sets.mark_job_failed(session, job_id)
+        # Lead Persona Sets: flip a still-generating set to failed in the
+        # same terminal txn (no-op for normal jobs). See src/lead_sets.py.
+        from src import lead_sets
+        lead_sets.mark_job_failed(session, job_id)
         session.commit()
 
     # Refund reservation
@@ -651,17 +661,24 @@ def recover_orphaned_running_jobs(session: Session) -> int:
 def run_all_sweeps(session: Session) -> dict:
     """Run all sweepers.  Returns a summary dict."""
     from src import quota
+    from src import lead_sets
     orphaned = recover_orphaned_running_jobs(session)
     timed_out = sweep_timed_out_jobs(session)
     snapshots = sweep_old_file_snapshots(session)
     events = sweep_old_events(session)
     reservations = quota.sweep_orphaned_reservations(session)
+    # Lead Persona Sets: a set whose job never got linked, or whose terminal
+    # transition missed its hook, would otherwise sit in 'generating' forever.
+    stuck_lead_sets = lead_sets.reconcile_stuck_sets(session)
+    if stuck_lead_sets:
+        session.commit()
     return {
         "orphaned_running_recovered": orphaned,
         "timed_out": timed_out,
         "file_snapshots_nulled": snapshots,
         "events_deleted": events,
         "reservations_refunded": reservations,
+        "lead_sets_reconciled": stuck_lead_sets,
     }
 
 

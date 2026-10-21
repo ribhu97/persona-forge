@@ -257,12 +257,14 @@ def _final_transaction(job: GenerationJob, personas_data: list) -> bool:
             session.add(msg)
             session.flush()
 
-            save_personas(session, msg.id, job.user_id, personas_data)
-
-            # Lead Persona Sets: eager freeze of raw JSON inside this same txn
-            # (no-op for normal jobs). See src/lead_sets.py.
+            # Lead Persona Sets: the freeze doubles as the discriminator. True
+            # means this job's personas live only as frozen JSON on the lead
+            # set — the claim writes the one real copy into the claimer's
+            # conversation — so no duplicate persona rows are staged here.
             from src import lead_sets
-            lead_sets.capture_job_result(session, job.id, personas_data)
+            is_lead_set_job = lead_sets.capture_job_result(session, job.id, personas_data)
+            if not is_lead_set_job:
+                save_personas(session, msg.id, job.user_id, personas_data)
 
             from src.models import Conversation
             conv = session.get(Conversation, job.conversation_id)

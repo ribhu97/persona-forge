@@ -8,7 +8,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: Optional[str] = None
-    lead_token: Optional[str] = None  # Lead Persona Set link token, threaded to verify-otp
 
 class UserLogin(BaseModel):
     email: EmailStr

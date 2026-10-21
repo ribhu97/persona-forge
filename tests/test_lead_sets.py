@@ -2,10 +2,13 @@
 Unit tests for the Lead Persona Set module (src/lead_sets.py).
 
 In-memory SQLite, no AI providers. Covers the four verbs through the
-module interface: create, public view states, claim (token / email
-fallback / CAS race), and the capture/failure hooks.
+module interface: create (atomic job link, failure cleanup), public view
+states, claim (token / email fallback / newest-only scope / CAS race /
+tier exemption), the capture and failure hooks, and the stuck-set
+reconciler.
 """
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -14,14 +17,16 @@ from sqlmodel.pool import StaticPool
 
 from src import jobs, lead_sets, quota, think_hard
 from src.lead_sets import (
+    RECONCILE_GRACE_SECONDS,
     LeadSetValidationError,
     capture_job_result,
     create_for_marketing,
     get_public_view,
     mark_job_failed,
     maybe_claim,
+    reconcile_stuck_sets,
 )
-from src.models import Conversation, LeadPersonaSet, Message, User
+from src.models import Conversation, GenerationJob, LeadPersonaSet, Message, Persona, User
 
 
 PERSONAS = [{
@@ -242,6 +247,252 @@ class TestClaim:
         with Session(test_engine) as session:
             user = _make_user(session)
             assert maybe_claim(session, user) is None
+
+
+class TestClaimScope:
+    """One claim per call: the newest matching set, and only that one."""
+
+    def test_email_fallback_claims_only_newest(self, test_engine):
+        now = datetime.now(timezone.utc)
+        with Session(test_engine) as session:
+            older = _make_ready_set(session, email="founder@acme.co")
+            older.created_at = now - timedelta(minutes=5)
+            session.add(older)
+            session.commit()
+            newer = _make_ready_set(session, email="founder@acme.co")
+            newer.created_at = now - timedelta(minutes=1)
+            session.add(newer)
+            session.commit()
+
+            user = _make_user(session, email="founder@acme.co")
+            outcome = maybe_claim(session, user)
+            session.commit()
+            session.refresh(older)
+            session.refresh(newer)
+
+            assert outcome is not None
+            assert newer.state == "claimed"
+            assert older.state == "ready"
+            convs = session.exec(
+                select(Conversation).where(Conversation.user_id == user.id)
+            ).all()
+            assert len(convs) == 1
+
+    def test_token_match_beats_email_fallback(self, test_engine):
+        now = datetime.now(timezone.utc)
+        with Session(test_engine) as session:
+            by_token = _make_ready_set(session, email="founder@acme.co")
+            by_token.created_at = now - timedelta(minutes=10)  # older than the email match
+            session.add(by_token)
+            session.commit()
+            newer = _make_ready_set(session, email="founder@acme.co")
+            newer.created_at = now - timedelta(minutes=1)
+            session.add(newer)
+            session.commit()
+
+            user = _make_user(session, email="founder@acme.co")
+            outcome = maybe_claim(session, user, token=by_token.token)
+            session.commit()
+            session.refresh(by_token)
+            session.refresh(newer)
+
+            assert outcome is not None
+            assert by_token.state == "claimed"
+            assert newer.state == "ready"
+
+    def test_lost_cas_race_loses_only_that_claim(self, test_engine):
+        """
+        A lost CAS must discard only the claim. A plain session.rollback()
+        would also throw away whatever the caller had staged — and hand back
+        a conversation id that no longer exists.
+        """
+
+        class ZeroRows:
+            rowcount = 0
+
+        with Session(test_engine) as session:
+            lead_set = _make_ready_set(session)
+            user = _make_user(session)
+
+            # Work the caller (an auth handler) staged before claiming.
+            pending = User(email="pending-write@x.co", is_verified=True)
+            session.add(pending)
+            session.flush()
+
+            real_execute = session.execute
+
+            def losing_execute(statement, *args, **kwargs):
+                if getattr(statement, "is_update", False):
+                    return ZeroRows()
+                return real_execute(statement, *args, **kwargs)
+
+            session.execute = losing_execute
+            outcome = maybe_claim(session, user, token=lead_set.token)
+            session.execute = real_execute
+            session.commit()
+            session.expire_all()
+
+            assert outcome is None
+            assert session.get(LeadPersonaSet, lead_set.id).state == "ready"
+            assert session.exec(select(Conversation)).all() == []
+            assert session.exec(select(Persona)).all() == []
+            assert session.exec(
+                select(User).where(User.email == "pending-write@x.co")
+            ).first() is not None
+
+    def test_claim_exempt_from_conversation_limit(self, test_engine):
+        """Claims are pre-paid by marketing: a free user at their limit still claims."""
+        with Session(test_engine) as session:
+            user = _make_user(session)
+            assert user.account_type == 0
+            for i in range(3):  # free tier allows 3 conversations/month
+                session.add(Conversation(user_id=user.id, title=f"existing {i}"))
+            session.commit()
+
+            lead_set = _make_ready_set(session)
+            outcome = maybe_claim(session, user, token=lead_set.token)
+            session.commit()
+
+            assert outcome is not None
+            session.refresh(lead_set)
+            assert lead_set.state == "claimed"
+
+    def test_claim_with_unusable_personas_returns_none(self, test_engine):
+        with Session(test_engine) as session:
+            lead_set = _make_ready_set(session)
+            lead_set.raw_personas = "{not json"
+            session.add(lead_set)
+            session.commit()
+
+            user = _make_user(session)
+            assert maybe_claim(session, user, token=lead_set.token) is None
+            session.refresh(lead_set)
+            assert lead_set.state == "ready"
+
+
+class TestCreateLifecycle:
+    def test_create_links_job_id_atomically(self, test_engine, monkeypatch):
+        """The job_id link must ride create_job's own transaction, not a later commit."""
+        seen = {}
+
+        class FakeJob:
+            id = "job-atomic"
+
+        def fake_create_job(user_id, conversation_id, *, on_created=None, **kwargs):
+            seen["on_created"] = on_created
+            assert on_created is not None, "create_for_marketing must pass on_created"
+            # Mimic the real create_job: its own session, its own commit.
+            with Session(test_engine) as job_session:
+                on_created(job_session, FakeJob())
+                job_session.commit()
+            return FakeJob()
+
+        monkeypatch.setattr(jobs, "create_job", fake_create_job)
+
+        with Session(test_engine) as session:
+            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            lead_set_id = lead_set.id
+            # The caller's stale in-memory copy must not be able to clobber it.
+            assert lead_set.job_id == "job-atomic"
+
+        with Session(test_engine) as session:
+            assert session.get(LeadPersonaSet, lead_set_id).job_id == "job-atomic"
+
+    def test_create_job_failure_leaves_no_rows(self, test_engine, monkeypatch):
+        def boom(*args, **kwargs):
+            raise RuntimeError("quota exhausted")
+
+        monkeypatch.setattr(jobs, "create_job", boom)
+
+        with Session(test_engine) as session:
+            with pytest.raises(RuntimeError):
+                create_for_marketing(
+                    session, product_description="A budgeting app", lead_email="lead@acme.co"
+                )
+            session.expire_all()
+            assert session.exec(select(LeadPersonaSet)).all() == []
+            assert session.exec(select(Conversation)).all() == []
+            # The ghost user is a singleton, not per-set garbage.
+            assert len(session.exec(select(User)).all()) == 1
+
+    def test_create_binds_job_by_idempotency_key(self, test_engine):
+        with Session(test_engine) as session:
+            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            assert lead_set.job_id is not None
+            job = jobs.get_job(lead_set.job_id)
+            assert job.idempotency_key == f"lead-set-{lead_set.id}"
+
+
+class TestReconcileStuckSets:
+    def _generating(self, **kwargs):
+        kwargs.setdefault("product_description", "d")
+        return LeadPersonaSet(
+            token=lead_sets.secrets.token_urlsafe(8), state="generating", **kwargs
+        )
+
+    def test_flips_only_provably_stuck_sets(self, test_engine):
+        now = datetime.now(timezone.utc)
+        with Session(test_engine) as session:
+            fresh_null = self._generating()                       # too young, no job
+            old_null = self._generating(
+                created_at=now - timedelta(seconds=RECONCILE_GRACE_SECONDS * 2)
+            )
+            dead_job = GenerationJob(
+                id="job-dead", user_id=1, conversation_id=1, mode="think_hard",
+                state=jobs.STATE_FAILED, input_text="x",
+                user_message_id=1, assistant_message_id=1,
+                expires_at=now + timedelta(hours=1),
+            )
+            linked_dead = self._generating(job_id="job-dead")      # job already terminal
+            live_job = GenerationJob(
+                id="job-live", user_id=1, conversation_id=1, mode="think_hard",
+                state=jobs.STATE_RUNNING, input_text="x",
+                user_message_id=1, assistant_message_id=1,
+                expires_at=now + timedelta(hours=1),
+            )
+            linked_live = self._generating(
+                job_id="job-live",
+                created_at=now - timedelta(seconds=RECONCILE_GRACE_SECONDS * 2),
+            )
+            ready = LeadPersonaSet(
+                token=lead_sets.secrets.token_urlsafe(8),
+                product_description="d", state="ready",
+                created_at=now - timedelta(seconds=RECONCILE_GRACE_SECONDS * 2),
+            )
+            session.add_all([fresh_null, old_null, dead_job, linked_dead, live_job, linked_live, ready])
+            session.commit()
+
+            assert reconcile_stuck_sets(session) == 2
+            session.commit()
+            for row in (fresh_null, old_null, linked_dead, linked_live, ready):
+                session.refresh(row)
+
+            assert fresh_null.state == "generating"
+            assert linked_live.state == "generating"
+            assert ready.state == "ready"
+            assert old_null.state == "failed"
+            assert linked_dead.state == "failed"
+
+
+class TestLeadJobPersistence:
+    def test_lead_job_freezes_json_and_persists_no_persona_rows(self, test_engine):
+        """The frozen JSON is the single source of truth for a lead job."""
+        with Session(test_engine) as session:
+            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            lead_set_id = lead_set.id
+            job_id = lead_set.job_id
+
+        jobs.claim_next_queued("worker-1")  # queued -> running
+        assert think_hard._final_transaction(jobs.get_job(job_id), PERSONAS) is True
+
+        with Session(test_engine) as session:
+            fresh = session.get(LeadPersonaSet, lead_set_id)
+            assert fresh.state == "ready"
+            assert json.loads(fresh.raw_personas) == PERSONAS
+            assert session.exec(select(Persona)).all() == []
+            msg = session.get(Message, jobs.get_job(job_id).assistant_message_id)
+            assert msg.is_pending is False
+            assert msg.content == f"Generated {len(PERSONAS)} personas"
 
 
 

@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 from sqlalchemy import update
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
+import logging
 
 from src.database import get_session
 from src.models import User, OneTimePassword, OTP_MAX_ATTEMPTS
@@ -18,6 +19,35 @@ from src.email_service import send_otp_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
+
+logger = logging.getLogger(__name__)
+
+
+def _claim_and_commit(session: Session, user: User, lead_token: str | None) -> int | None:
+    """
+    Fire the Lead Persona Set claim and commit it. Returns the claimed
+    conversation id, or None when there is nothing to claim.
+
+    A claim failure must never fail the auth request: by the time this runs
+    verify-otp has already consumed the OTP, so an exception escaping here
+    would lock the user out of the account they just created.
+    """
+    from src import lead_sets
+    try:
+        claimed = lead_sets.maybe_claim(session, user, token=lead_token)
+    except Exception:
+        logger.exception("[auth] lead-set claim failed for user %s", user.id)
+        session.rollback()
+        return None
+    if not claimed:
+        return None
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("[auth] lead-set claim commit failed for user %s", user.id)
+        session.rollback()
+        return None
+    return claimed.conversation_id
 
 @router.post("/signup", response_model=dict)
 @limiter.limit("5/minute")
@@ -116,14 +146,11 @@ async def verify_otp(request: Request, data: OTPVerify, session: Annotated[Sessi
     session.commit()
 
     # Lead Persona Sets: fire the Claim (token-first, email fallback). None = nothing to claim.
-    from src import lead_sets
-    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
-    if claimed:
-        session.commit()
+    claimed_conversation_id = _claim_and_commit(session, user, data.lead_token)
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer",
-            "claimed_conversation_id": claimed.conversation_id if claimed else None}
+            "claimed_conversation_id": claimed_conversation_id}
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
@@ -136,14 +163,11 @@ async def login(request: Request, data: UserLogin, session: Annotated[Session, D
         raise HTTPException(status_code=401, detail="Email not verified. Please verify OTP.")
         
     # Lead Persona Sets: fire the Claim (token-first, email fallback).
-    from src import lead_sets
-    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
-    if claimed:
-        session.commit()
+    claimed_conversation_id = _claim_and_commit(session, user, data.lead_token)
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer",
-            "claimed_conversation_id": claimed.conversation_id if claimed else None}
+            "claimed_conversation_id": claimed_conversation_id}
 
 @router.post("/google", response_model=Token)
 @limiter.limit("10/minute")
@@ -178,14 +202,11 @@ async def google_login(request: Request, data: GoogleLogin, session: Annotated[S
             session.commit()
             
     # Lead Persona Sets: fire the Claim (token-first, email fallback).
-    from src import lead_sets
-    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
-    if claimed:
-        session.commit()
+    claimed_conversation_id = _claim_and_commit(session, user, data.lead_token)
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer",
-            "claimed_conversation_id": claimed.conversation_id if claimed else None}
+            "claimed_conversation_id": claimed_conversation_id}
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):

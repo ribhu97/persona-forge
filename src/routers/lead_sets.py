@@ -14,22 +14,29 @@ import os
 import secrets as py_secrets
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlmodel import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sqlmodel import Session, select
 
 from src.database import get_session
 from src.dependencies import get_current_user
 from src.lead_sets import (
+    STATE_CLAIMED,
+    STATE_FAILED,
+    STATE_GENERATING,
     LeadSetValidationError,
     create_for_marketing,
     get_public_view,
     maybe_claim,
 )
-from src.models import User
+from src.models import LeadPersonaSet, User
 
 
 router = APIRouter(prefix="/lead-sets", tags=["lead-sets"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 def require_service_token(
@@ -39,7 +46,11 @@ def require_service_token(
     expected = os.environ.get("LEAD_SERVICE_TOKEN")
     if not expected:
         raise HTTPException(status_code=503, detail="Service token not configured")
-    if not x_service_token or not py_secrets.compare_digest(x_service_token, expected):
+    # Encode first: compare_digest raises TypeError on non-ASCII str, which
+    # would turn a hostile header into a 500 instead of a 401.
+    if not x_service_token or not py_secrets.compare_digest(
+        x_service_token.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise HTTPException(status_code=401, detail="Invalid service token")
 
 
@@ -77,13 +88,19 @@ async def create_lead_set(
 
 
 @router.get("/{token}")
-async def view_lead_set(token: str):
-    """Public read: the token is the capability. No auth, no expiry."""
+@limiter.limit("60/minute")
+async def view_lead_set(request: Request, token: str):
+    """
+    Public read: the token is the capability. No auth, no expiry.
+
+    Rate-limited and uncacheable: the URL is a bearer capability, so it must
+    never land in a shared or on-disk cache.
+    """
     try:
         view = get_public_view(token)
     except LookupError:
         raise HTTPException(status_code=404, detail="Lead persona set not found")
-    return view.dict()
+    return JSONResponse(content=view.dict(), headers={"Cache-Control": "no-store"})
 
 
 @router.post("/{token}/claim")
@@ -92,21 +109,33 @@ async def claim_lead_set(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Explicit claim for an already-logged-in Lead. Idempotent per owner."""
+    """
+    Explicit claim for an already-logged-in Lead. Idempotent per owner.
+
+    Non-claimable states are distinguished so the client can render the right
+    thing: 425 while generating, 410 when generation failed, 409 when someone
+    else already claimed it.
+    """
     claimed = maybe_claim(session, user, token=token)
     if claimed:
         session.commit()
         return {"claimed": True,
                 "conversation_id": claimed.conversation_id}
-    # Nothing to claim: either already claimed (by this user or another)
-    # or the token is unknown. Distinguish for the frontend redirect.
-    from sqlmodel import select
-    from src.models import LeadPersonaSet
+
+    # Nothing claimed: either already claimed (by this user or another), or
+    # not claimable yet. The row itself says which.
     lead_set = session.exec(
         select(LeadPersonaSet).where(LeadPersonaSet.token == token)
     ).first()
-    if lead_set and lead_set.state == "claimed" and lead_set.claimed_by_user_id == user.id:
+    if lead_set is None:
+        raise HTTPException(status_code=404, detail={"state": None})
+    if lead_set.state == STATE_CLAIMED and lead_set.claimed_by_user_id == user.id:
+        # Lost the CAS to our own concurrent request: still ours.
         return {"claimed": True, "conversation_id": lead_set.claimed_conversation_id}
-    if lead_set:
-        raise HTTPException(status_code=409, detail="Already claimed by another user")
-    raise HTTPException(status_code=404, detail="Lead persona set not found")
+    if lead_set.state == STATE_GENERATING:
+        raise HTTPException(status_code=425, detail={"state": STATE_GENERATING})
+    if lead_set.state == STATE_FAILED:
+        raise HTTPException(status_code=410, detail={"state": STATE_FAILED})
+    # 'claimed' by another user, or 'ready' but unclaimable (unusable frozen
+    # payload, or another request won the CAS).
+    raise HTTPException(status_code=409, detail={"state": lead_set.state})
