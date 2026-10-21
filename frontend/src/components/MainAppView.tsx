@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Grip, X } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { isAxiosError } from 'axios';
@@ -146,6 +146,18 @@ export function MainAppView() {
   useEffect(() => {
     return () => { sseClientRef.current?.close(); };
   }, []);
+
+  // Lead claim redirect: /p/:token auth success navigates here with
+  // state.selectConversation — open the claimed conversation immediately.
+  const location = useLocation();
+  useEffect(() => {
+    const selectConversationId = (location.state as { selectConversation?: number } | null)?.selectConversation;
+    if (selectConversationId && selectConversationId !== currentConversationId) {
+      selectConversation(selectConversationId);
+      // Clear the state so a remount doesn't re-select after the user switches away.
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, currentConversationId, selectConversation, navigate]);
 
   // Sync chat personas to persona store and handle versioning
   useEffect(() => {

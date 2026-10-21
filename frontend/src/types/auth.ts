@@ -18,6 +18,7 @@ export const AccountType = {
 export interface LoginResponse {
     access_token: string;
     token_type: string;
+    claimed_conversation_id?: number | null;
 }
 
 export interface SignupResponse {

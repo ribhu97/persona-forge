@@ -25,6 +25,7 @@ from src.routers.personas import router as personas_router
 from src.routers.blog import router as blog_router
 from src.routers.persona_chat import router as persona_chat_router
 from src.routers.jobs import router as jobs_router
+from src.routers.lead_sets import router as lead_sets_router
 import uvicorn
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,7 @@ app.include_router(personas_router, prefix="/api")
 app.include_router(blog_router, prefix="/api")
 app.include_router(persona_chat_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
+app.include_router(lead_sets_router, prefix="/api")
 
 @app.get("/")
 async def root():

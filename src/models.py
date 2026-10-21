@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import UniqueConstraint, Column, ForeignKey
+from sqlalchemy import UniqueConstraint
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -75,14 +75,13 @@ class Message(SQLModel, table=True):
     attachment_char_count: Optional[int] = None
     # Think Hard / job lifecycle
     is_pending: bool = Field(default=False)  # UI hides content; shows progress
-    pending_generation_job_id: Optional[str] = Field(
-        default=None,
-        sa_column=Column(
-            "pending_generation_job_id",
-            ForeignKey("generation_jobs.id", use_alter=True),
-            nullable=True,
-        ),
-    )
+    # Soft pointer to the in-flight job, cleared once it settles. Deliberately
+    # NOT a foreign key: create_job writes this while inserting the assistant
+    # message, before the generation_jobs row exists, so a constraint would
+    # fail on any fresh database (PRAGMA foreign_keys=ON). Databases migrated
+    # by create_db_and_tables() never had one either — the two shapes must
+    # match. See tests/test_fresh_db_schema.py.
+    pending_generation_job_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     conversation: Conversation = Relationship(back_populates="messages")
@@ -240,6 +239,24 @@ class BlogPost(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
     )
+
+# ── Lead Persona Sets (GTM: ownerless until Claim) ───────────────────────────
+
+class LeadPersonaSet(SQLModel, table=True):
+    __tablename__ = "lead_persona_sets"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)  # secrets.token_urlsafe — unguessable, the public link capability
+    lead_email: Optional[str] = Field(default=None, index=True)  # claim-match fallback (case-normalized)
+    product_description: str  # becomes the claimed Conversation's first user message
+    raw_personas: Optional[str] = None  # JSON string — generator output, frozen at readiness
+    state: str = Field(default="generating")  # generating|ready|claimed|failed — one-way transitions
+    job_id: Optional[str] = Field(default=None, foreign_key="generation_jobs.id")
+    channel: Optional[str] = None  # outreach channel attribution (e.g. "email", "twitter")
+    claimed_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    claimed_conversation_id: Optional[int] = Field(default=None, foreign_key="conversations.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ready_at: Optional[datetime] = None
+    claimed_at: Optional[datetime] = None
 
 # ── Think Hard: quota, jobs, events ───────────────────────────────────────────
 

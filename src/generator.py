@@ -545,9 +545,11 @@ def generate_personas(
     Raises
     ------
     AllProvidersRateLimitedError
-        When both Gemini returned 429 AND Groq is rate-limited or misconfigured.
+        When Gemini returned 429/5xx (e.g. 503 UNAVAILABLE) AND Groq is
+        rate-limited or misconfigured.
     google.genai.errors.ClientError
-        Non-429 Gemini client errors (auth, billing, etc.) propagate as-is.
+        Non-retryable Gemini client errors (auth, billing, etc.) propagate as-is.
+        Retryable codes (429/500/502/503/504) fall back to Groq instead.
     Exception
         Other Groq errors (network, invalid model name, etc.) propagate as-is → 500.
     """
@@ -556,7 +558,7 @@ def generate_personas(
         http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT * 1000),
     )
 
-    model = "gemini-2.5-flash-lite"
+    model = "gemini-3.1-flash-lite"
 
     # Build user parts — text first, then optional file attachment
     def _build_gemini_parts(user_text: str) -> list:
@@ -621,11 +623,12 @@ def generate_personas(
         )
         raw_output_str = output.candidates[0].content.parts[0].text
         return parse_json(raw_output_str)
-    except genai_errors.ClientError as e:
-        if e.code != 429:
+    except (genai_errors.ClientError, genai_errors.ServerError) as e:
+        if e.code not in (429, 500, 502, 503, 504):
             # Auth failure, billing issue, or other 4xx — don't mask as capacity
             raise
-        print(f"Gemini rate-limited (429 {e.status}). Falling back to Groq.")
+        # 5xx (503 UNAVAILABLE included) arrives as ServerError; 429 as ClientError.
+        print(f"Gemini unavailable ({e.code} {e.status}). Falling back to Groq.")
 
     # --- Groq fallback ---
     # extracted_text was populated during upload processing, so no re-processing needed.

@@ -9,6 +9,7 @@ import { BlogListPage } from './components/blog/BlogListPage'
 import { BlogPostPage } from './components/blog/BlogPostPage'
 import { PricingPage } from './components/pricing/PricingPage'
 import { PrivacyPolicyPage } from './components/legal/PrivacyPolicyPage'
+import { LeadSetPage } from './components/lead/LeadSetPage'
 import { TermsOfServicePage } from './components/legal/TermsOfServicePage'
 
 // Resolves .generated/blog-posts.json relative to cwd (frontend root).
@@ -48,6 +49,14 @@ async function blogPostLoader({ params }: LoaderFunctionArgs) {
   return res.json()
 }
 
+// Lead Persona Set loader — client-side only (tokens are per-lead, never SSG'd)
+async function leadSetLoader({ params }: LoaderFunctionArgs) {
+  if (import.meta.env.SSR) return null
+  const res = await fetch(`/api/lead-sets/${params.token}`)
+  if (!res.ok) return null
+  return res.json()
+}
+
 // getStaticPaths — runs at build time only. Must use dynamic import (not require):
 // routes.tsx is bundled as ESM for the SSR build, where `require` is undefined, and it's
 // also imported by the client bundle, so node modules can't be imported at top level.
@@ -75,6 +84,12 @@ export const routes: RouteRecord[] = [
         path: 'chat/:personaId',
         element: <PersonaChatPage />,
       },
+      {
+        path: 'p/:token',
+        element: <LeadSetPage />,
+        loader: leadSetLoader,
+      },
+
       {
         path: 'blog',
         element: <BlogListPage />,
