@@ -39,11 +39,8 @@ from src.generator import (
     _extract_json_object,
 )
 from src.exceptions import AllProvidersRateLimitedError
-from src.models import (
-    GenerationJob, GenerationJobEvent, Message, Persona, Demographics,
-    Goal, Frustration, BehavioralPattern, InfluenceNetwork,
-    RecruitmentCriteria, ResearchAssumption,
-)
+from src.models import GenerationJob, GenerationJobEvent, Message
+from src.persona_persistence import save_personas
 from src.prompts import (
     refined_generation_prompt,
     DRAFT_ANGLE_SUFFIXES,
@@ -127,47 +124,6 @@ def _validate_critique(parsed: dict) -> dict:
     if issues is not None and not isinstance(issues, list):
         raise InvalidOutputError("Critique 'issues' must be a list")
     return parsed
-
-
-# ── Persistence ───────────────────────────────────────────────────────────────
-
-def _save_personas(session: Session, message_id: int, user_id: int, personas_data: list) -> None:
-    """Stage persona rows into the session without committing (caller owns txn)."""
-    for p_data in personas_data:
-        persona = Persona(
-            message_id=message_id,
-            user_id=user_id,
-            name=p_data["name"],
-            status=p_data["status"],
-            role=p_data["role"],
-            tech_comfort=p_data["tech_comfort"],
-            scenario_context=p_data.get("scenario_context", ""),
-        )
-        session.add(persona)
-        session.flush()
-
-        if isinstance(p_data.get("demographics"), dict):
-            demo = p_data["demographics"]
-            session.add(Demographics(
-                persona_id=persona.id,
-                age=str(demo.get("age")),
-                location=demo.get("location"),
-                education=demo.get("education"),
-                industry=demo.get("industry"),
-            ))
-
-        for i, text in enumerate(p_data.get("goals", [])):
-            session.add(Goal(persona_id=persona.id, goal_text=text, order_index=i))
-        for i, text in enumerate(p_data.get("frustrations", [])):
-            session.add(Frustration(persona_id=persona.id, frustration_text=text, order_index=i))
-        for i, text in enumerate(p_data.get("behavioral_patterns", [])):
-            session.add(BehavioralPattern(persona_id=persona.id, pattern_text=text, order_index=i))
-        for i, text in enumerate(p_data.get("influence_networks", [])):
-            session.add(InfluenceNetwork(persona_id=persona.id, network_text=text, order_index=i))
-        for i, text in enumerate(p_data.get("recruitment_criteria", [])):
-            session.add(RecruitmentCriteria(persona_id=persona.id, criteria_text=text, order_index=i))
-        for i, text in enumerate(p_data.get("research_assumptions", [])):
-            session.add(ResearchAssumption(persona_id=persona.id, assumption_text=text, order_index=i))
 
 
 # ── Stage functions ───────────────────────────────────────────────────────────
@@ -301,7 +257,12 @@ def _final_transaction(job: GenerationJob, personas_data: list) -> bool:
             session.add(msg)
             session.flush()
 
-            _save_personas(session, msg.id, job.user_id, personas_data)
+            save_personas(session, msg.id, job.user_id, personas_data)
+
+            # Lead Persona Sets: eager freeze of raw JSON inside this same txn
+            # (no-op for normal jobs). See src/lead_sets.py.
+            from src import lead_sets
+            lead_sets.capture_job_result(session, job.id, personas_data)
 
             from src.models import Conversation
             conv = session.get(Conversation, job.conversation_id)

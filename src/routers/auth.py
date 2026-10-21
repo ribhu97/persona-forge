@@ -115,8 +115,15 @@ async def verify_otp(request: Request, data: OTPVerify, session: Annotated[Sessi
     session.delete(otp)
     session.commit()
 
+    # Lead Persona Sets: fire the Claim (token-first, email fallback). None = nothing to claim.
+    from src import lead_sets
+    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
+    if claimed:
+        session.commit()
+
     access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer",
+            "claimed_conversation_id": claimed.conversation_id if claimed else None}
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
@@ -128,8 +135,15 @@ async def login(request: Request, data: UserLogin, session: Annotated[Session, D
     if not user.is_verified:
         raise HTTPException(status_code=401, detail="Email not verified. Please verify OTP.")
         
+    # Lead Persona Sets: fire the Claim (token-first, email fallback).
+    from src import lead_sets
+    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
+    if claimed:
+        session.commit()
+
     access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer",
+            "claimed_conversation_id": claimed.conversation_id if claimed else None}
 
 @router.post("/google", response_model=Token)
 @limiter.limit("10/minute")
@@ -163,8 +177,15 @@ async def google_login(request: Request, data: GoogleLogin, session: Annotated[S
             session.add(user)
             session.commit()
             
+    # Lead Persona Sets: fire the Claim (token-first, email fallback).
+    from src import lead_sets
+    claimed = lead_sets.maybe_claim(session, user, token=getattr(data, "lead_token", None))
+    if claimed:
+        session.commit()
+
     access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer",
+            "claimed_conversation_id": claimed.conversation_id if claimed else None}
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):

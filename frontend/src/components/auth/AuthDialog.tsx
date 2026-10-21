@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/lib/api';
+import { takePendingLeadToken } from '@/lib/leadToken';
 
 interface AuthDialogProps {
     open: boolean;
@@ -33,6 +35,14 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     const [error, setError] = useState<string | null>(null);
 
     const { setToken, setUser } = useAuthStore();
+    const navigate = useNavigate();
+
+    // Land the Lead directly in their claimed conversation after auth from /p/:token.
+    const finishAuth = (claimedConversationId?: number | null) => {
+        if (claimedConversationId) {
+            navigate('/', { state: { selectConversation: claimedConversationId } });
+        }
+    };
 
     const resetForm = () => {
         setEmail('');
@@ -57,21 +67,23 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
         try {
             if (mode === 'login') {
-                const response = await authAPI.login({ email, password });
+                const response = await authAPI.login({ email, password, lead_token: takePendingLeadToken() });
                 setToken(response.access_token);
                 const user = await authAPI.me();
                 setUser(user);
                 handleOpenChange(false);
+                finishAuth(response.claimed_conversation_id);
             } else {
                 if (signupStep === 'details') {
-                    await authAPI.signup({ email, password, name });
+                    await authAPI.signup({ email, password, name, lead_token: takePendingLeadToken() });
                     setSignupStep('otp');
                 } else {
-                    const response = await authAPI.verifyOtp({ email, otp });
+                    const response = await authAPI.verifyOtp({ email, otp, lead_token: takePendingLeadToken() });
                     setToken(response.access_token);
                     const user = await authAPI.me();
                     setUser(user);
                     handleOpenChange(false);
+                    finishAuth(response.claimed_conversation_id);
                 }
             }
         } catch (err: any) {
@@ -92,7 +104,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 throw new Error('Google Login Failed: No token received');
             }
 
-            const response = await authAPI.googleLogin({ token });
+            const response = await authAPI.googleLogin({ token, lead_token: takePendingLeadToken() });
 
             if (!response || !response.access_token) {
                 throw new Error('Invalid response from server during Google login');
@@ -102,6 +114,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             const user = await authAPI.me();
             setUser(user);
             handleOpenChange(false);
+            finishAuth(response.claimed_conversation_id);
         } catch (err: any) {
             setError(err.message || 'Google login failed');
         } finally {

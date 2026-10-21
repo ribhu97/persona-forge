@@ -8,21 +8,26 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: Optional[str] = None
+    lead_token: Optional[str] = None  # Lead Persona Set link token, threaded to verify-otp
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    lead_token: Optional[str] = None  # Lead Persona Set link token — fires Claim on login
 
 class OTPVerify(BaseModel):
     email: EmailStr
     otp: str
+    lead_token: Optional[str] = None  # Lead Persona Set link token — fires Claim at verify
 
 class GoogleLogin(BaseModel):
     token: str
+    lead_token: Optional[str] = None  # Lead Persona Set link token — fires Claim on Google login
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+    claimed_conversation_id: Optional[int] = None  # set when a Lead Persona Set was claimed
 
 class UserResponse(BaseModel):
     id: int

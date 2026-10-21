@@ -241,6 +241,24 @@ class BlogPost(SQLModel, table=True):
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
     )
 
+# ── Lead Persona Sets (GTM: ownerless until Claim) ───────────────────────────
+
+class LeadPersonaSet(SQLModel, table=True):
+    __tablename__ = "lead_persona_sets"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)  # secrets.token_urlsafe — unguessable, the public link capability
+    lead_email: Optional[str] = Field(default=None, index=True)  # claim-match fallback (case-normalized)
+    product_description: str  # becomes the claimed Conversation's first user message
+    raw_personas: Optional[str] = None  # JSON string — generator output, frozen at readiness
+    state: str = Field(default="generating")  # generating|ready|claimed|failed — one-way transitions
+    job_id: Optional[str] = Field(default=None, foreign_key="generation_jobs.id")
+    channel: Optional[str] = None  # outreach channel attribution (e.g. "email", "twitter")
+    claimed_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    claimed_conversation_id: Optional[int] = Field(default=None, foreign_key="conversations.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ready_at: Optional[datetime] = None
+    claimed_at: Optional[datetime] = None
+
 # ── Think Hard: quota, jobs, events ───────────────────────────────────────────
 
 class QuotaReservation(SQLModel, table=True):

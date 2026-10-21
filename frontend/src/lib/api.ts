@@ -113,7 +113,7 @@ export const authAPI = {
     return response.data;
   },
 
-  googleLogin: async (data: { token: string }): Promise<LoginResponse> => {
+  googleLogin: async (data: { token: string; lead_token?: string | null }): Promise<LoginResponse> => {
     const response = await apiClient.post<LoginResponse>('/auth/google', data);
     return response.data;
   }

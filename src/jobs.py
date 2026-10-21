@@ -488,6 +488,11 @@ def fail_job(
                 msg.content = f"Generation failed: {error_code}"
                 msg.pending_generation_job_id = None
                 session.add(msg)
+
+            # Lead Persona Sets: flip a still-generating set to failed in the
+            # same terminal txn (no-op for normal jobs). See src/lead_sets.py.
+            from src import lead_sets
+            lead_sets.mark_job_failed(session, job_id)
         session.commit()
 
     # Refund reservation
@@ -524,6 +529,10 @@ def timeout_job(job_id: str, reservation_id: Optional[str] = None) -> bool:
                 msg.content = "Generation timed out."
                 msg.pending_generation_job_id = None
                 session.add(msg)
+
+        # Lead Persona Sets: flip a still-generating set to failed (no-op for normal jobs).
+        from src import lead_sets
+        lead_sets.mark_job_failed(session, job_id)
         session.commit()
 
     if reservation_id:

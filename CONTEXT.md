@@ -51,6 +51,27 @@ Policy: **additive-only**. PersonaForge may add new fields; it never removes or 
 A Conversation is a threaded session in which the user iteratively refines personas for a **single product or feature scope**. Each message turn produces a new set of personas based on the prior output and the user's follow-up instructions. Conversations are scoped to a single user.
 
 A product may have multiple conversations — one for the product overall, others for specific features. These are not structurally linked (no Project layer); organization is by naming only. A flat conversation list is sufficient until users are managing 10+ conversations per product.
+## Lead
+
+A **Lead** is a prospect PersonaForge targets in outbound GTM: a founder whose personas are pre-generated from public information about their idea, before they have an account. A Lead may or may not have contact info on file — the link itself is always sufficient identification.
+
+## Lead Persona Set
+
+A **Lead Persona Set** is a set of personas generated for a Lead before signup. It is ownerless — it belongs to no user — and reachable only through a unique, unguessable link. Its personas are frozen at generation; all later editing happens in the claimed Conversation, never in the set.
+### Lead Persona Set module
+
+The Lead Persona Set module owns the Lead lifecycle end-to-end behind four verbs: create (marketing, service-token-authenticated), read (public, by token), claim (auth handlers + explicit endpoint), and a generation-capture hook. Interface decisions:
+
+- **Generation capture is eager**: the jobs pipeline's final transaction freezes the raw persona JSON onto the Lead Persona Set row atomically with job success, flipping `state` to `ready` (or `failed`). No lazy capture on the read path.
+- **Claim fires on signup, Google signup, login, AND an authenticated explicit claim endpoint** — the last covers an already-logged-in Lead who clicks the link without any auth event firing. All four are the same one claim function, matched token-first then email-fallback.
+- **The read verb's return value is the complete view model** (full / blurred / generating / failed states decided inside); the HTTP router is a one-line adapter.
+- **One table, one link per set**: a `channel` string column records the outreach channel (email/twitter) for attribution. No per-channel link table, no event/analytics machinery — additive later if ever needed.
+- **Marketing identity**: a ghost admin User row (account_type=99, no login use) owns generation jobs; the marketing POST authenticates via a separate env-configured service token (`X-Service-Token`), checked before any user/quota machinery.
+
+## Claim
+
+**Claiming** converts a Lead Persona Set into the signing-up user's first Conversation: the set's personas and the original product description are seeded into a new Conversation owned by the new user. Claim is one-way and permanent — a claimed set can never be re-claimed. The public link remains alive after Claim, but shows only a fully blurred view of the frozen personas — the content is visible only inside the claimed Conversation.
+
 
 ## Subscription tiers
 
