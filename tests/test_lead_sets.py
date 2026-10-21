@@ -97,6 +97,8 @@ class TestCreateForMarketing:
             with pytest.raises(LeadSetValidationError):
                 create_for_marketing(session, product_description="   ")
             with pytest.raises(LeadSetValidationError):
+                create_for_marketing(session, product_description="test")
+            with pytest.raises(LeadSetValidationError):
                 create_for_marketing(session, product_description="x" * 20_001)
 
 
@@ -390,7 +392,7 @@ class TestCreateLifecycle:
         monkeypatch.setattr(jobs, "create_job", fake_create_job)
 
         with Session(test_engine) as session:
-            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            lead_set = create_for_marketing(session, product_description="A budgeting app for freelancers")
             lead_set_id = lead_set.id
             # The caller's stale in-memory copy must not be able to clobber it.
             assert lead_set.job_id == "job-atomic"
@@ -407,7 +409,7 @@ class TestCreateLifecycle:
         with Session(test_engine) as session:
             with pytest.raises(RuntimeError):
                 create_for_marketing(
-                    session, product_description="A budgeting app", lead_email="lead@acme.co"
+                    session, product_description="A budgeting app for freelancers", lead_email="lead@acme.co"
                 )
             session.expire_all()
             assert session.exec(select(LeadPersonaSet)).all() == []
@@ -417,7 +419,7 @@ class TestCreateLifecycle:
 
     def test_create_binds_job_by_idempotency_key(self, test_engine):
         with Session(test_engine) as session:
-            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            lead_set = create_for_marketing(session, product_description="A budgeting app for freelancers")
             assert lead_set.job_id is not None
             job = jobs.get_job(lead_set.job_id)
             assert job.idempotency_key == f"lead-set-{lead_set.id}"
@@ -478,7 +480,7 @@ class TestLeadJobPersistence:
     def test_lead_job_freezes_json_and_persists_no_persona_rows(self, test_engine):
         """The frozen JSON is the single source of truth for a lead job."""
         with Session(test_engine) as session:
-            lead_set = create_for_marketing(session, product_description="A budgeting app")
+            lead_set = create_for_marketing(session, product_description="A budgeting app for freelancers")
             lead_set_id = lead_set.id
             job_id = lead_set.job_id
 

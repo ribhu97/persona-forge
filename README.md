@@ -122,7 +122,7 @@ python src/generator.py
 The backend reads configuration from environment variables (via `python-dotenv`).
 
 - `GOOGLE_API_KEY` (required): Your Gemini API key
-- `LEAD_SERVICE_TOKEN` (optional, marketing links): Service token for `POST /api/lead-sets` — the marketing-agent endpoint that creates a Lead Persona Set and returns its public link (`/p/{token}`). Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. If unset, the endpoint fails closed with 503.
+- `LEAD_SERVICE_TOKEN` (optional, marketing links): Service token for `POST /api/lead-sets` — the marketing-agent endpoint that creates a Lead Persona Set and returns its public link (`/p/{token}`). Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. If unset, the endpoint fails closed with 503. Body: `{"product_description": "...", "lead_email": "...", "channel": "..."}` — the description must be at least 20 characters (shorter input cannot produce personas, so it is rejected with 422 up front rather than minting a link whose generation then fails).
 
 ### CORS (for frontend dev)
 Add this to `src/main.py` when integrating a local frontend (Vite default port shown):
