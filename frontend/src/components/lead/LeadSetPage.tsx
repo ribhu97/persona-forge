@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLoaderData, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -72,22 +72,44 @@ function openAuth(token: string | undefined) {
 const MAX_POLLS = 30;
 
 export function LeadSetPage() {
-  const loaderData = useLoaderData() as LeadSetView | null;
   const { token } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const [view, setView] = useState<LeadSetView | null>(loaderData);
+  // No route loader: every prod page is served from a pre-rendered HTML shell
+  // (nginx SPA fallback), and vite-react-ssg swaps every route loader for a
+  // static-data lookup that returns null for a path it never pre-rendered.
+  // A per-lead token is never pre-rendered, so the page must fetch its own view.
+  const [view, setView] = useState<LeadSetView | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [pollExhausted, setPollExhausted] = useState(false);
   const cancelledRef = useRef(false);
 
   useEffect(() => () => { cancelledRef.current = true; }, []);
 
   const refetchView = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`/api/lead-sets/${token}`);
-      if (res.ok && !cancelledRef.current) setView(await res.json());
-    } catch { /* keep the current view; the next poll retries */ }
+      if (cancelledRef.current) return;
+      if (res.ok) {
+        setView(await res.json());
+        setNotFound(false);
+        setLoadError(false);
+      } else if (res.status === 404) {
+        setNotFound(true);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      if (!cancelledRef.current) setLoadError(true);
+    }
   }, [token]);
+
+  // First paint for a visitor with no session: nothing has fetched the token yet.
+  useEffect(() => {
+    if (!view && !notFound) refetchView();
+  }, [view, notFound, refetchView]);
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -161,11 +183,28 @@ export function LeadSetPage() {
   );
 
   if (!view) {
+    if (notFound) {
+      return withChrome(<div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold">Link not found</h1>
+          <p className="mt-2 text-sm text-muted-foreground">This persona link is invalid or has expired.</p>
+          <Link to="/" className="mt-4 inline-block"><Button variant="outline" size="sm">Go to PersonaForge</Button></Link>
+        </div>
+      </div>);
+    }
+    if (loadError) {
+      return withChrome(<div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold">Couldn’t load these personas</h1>
+          <p className="mt-2 text-sm text-muted-foreground">The link may still be valid — the server didn’t answer.</p>
+          <Button className="mt-4" variant="outline" size="sm" onClick={() => { setLoadError(false); refetchView(); }}>Try again</Button>
+        </div>
+      </div>);
+    }
     return withChrome(<div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <h1 className="text-xl font-semibold">Link not found</h1>
-        <p className="mt-2 text-sm text-muted-foreground">This persona link is invalid or has expired.</p>
-        <Link to="/" className="mt-4 inline-block"><Button variant="outline" size="sm">Go to PersonaForge</Button></Link>
+        <h1 className="text-xl font-semibold">Fetching your personas…</h1>
+        <p className="mt-2 text-sm text-muted-foreground">One moment.</p>
       </div>
     </div>);
   }
