@@ -42,6 +42,10 @@ logger = logging.getLogger(__name__)
 
 GHOST_USER_EMAIL = "leads@persona-forge.internal"
 PRODUCT_DESCRIPTION_MAX_CHARS = 20_000
+# A link is only worth minting if the description can produce personas at all:
+# the provider answers a meaningless input ("test") with an empty persona array,
+# which fails the job ~1s later and leaves a dead link in the lead's inbox.
+PRODUCT_DESCRIPTION_MIN_CHARS = 20
 
 # A 'generating' set whose job was never linked is provably orphaned after this
 # long — the reconcile sweep flips it to 'failed'. See reconcile_stuck_sets.
@@ -142,6 +146,11 @@ def create_for_marketing(
     description = (product_description or "").strip()
     if not description:
         raise LeadSetValidationError("product_description must not be blank")
+    if len(description) < PRODUCT_DESCRIPTION_MIN_CHARS:
+        raise LeadSetValidationError(
+            f"product_description must be at least {PRODUCT_DESCRIPTION_MIN_CHARS} "
+            "characters — say what the product does and who it is for"
+        )
     if len(description) > PRODUCT_DESCRIPTION_MAX_CHARS:
         raise LeadSetValidationError(
             f"product_description exceeds {PRODUCT_DESCRIPTION_MAX_CHARS} characters"
