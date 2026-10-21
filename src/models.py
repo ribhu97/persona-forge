@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import UniqueConstraint, Column, ForeignKey
+from sqlalchemy import UniqueConstraint
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -75,14 +75,13 @@ class Message(SQLModel, table=True):
     attachment_char_count: Optional[int] = None
     # Think Hard / job lifecycle
     is_pending: bool = Field(default=False)  # UI hides content; shows progress
-    pending_generation_job_id: Optional[str] = Field(
-        default=None,
-        sa_column=Column(
-            "pending_generation_job_id",
-            ForeignKey("generation_jobs.id", use_alter=True),
-            nullable=True,
-        ),
-    )
+    # Soft pointer to the in-flight job, cleared once it settles. Deliberately
+    # NOT a foreign key: create_job writes this while inserting the assistant
+    # message, before the generation_jobs row exists, so a constraint would
+    # fail on any fresh database (PRAGMA foreign_keys=ON). Databases migrated
+    # by create_db_and_tables() never had one either — the two shapes must
+    # match. See tests/test_fresh_db_schema.py.
+    pending_generation_job_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     conversation: Conversation = Relationship(back_populates="messages")
